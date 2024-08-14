@@ -2,6 +2,7 @@
 Powershell module for downloading nessus reports
 
 Edit NessusReports.ps1
+
   [1] Edit the path you want the reports to download to: $Global:BasePath   = "$HOME\NessusReports"
   
   [2] Edit the server address to point to nessus server(s): [string[]]$ServerName = ('NESSUS_SERVER_ADDRESS')

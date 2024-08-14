@@ -1,0 +1,177 @@
+Import-Module (PATH_TO_NessusReports.ps1)
+Get-NessusReports -Folder FOLDER_NUMBER
+
+#$diffres = Nessus-Diff
+$date = get-date -Format "dd.MM.yyyy"
+
+<#
+#### Modify $VulnDiff variable to highlight critical risks and CVSS 10 vulnerabilities ####
+$VulnDiff = '<pre>{0}</pre>' -f ($diffres | ? {$_.'CVSS v2.0 Base Score' -ge 7} | select * -ExcludeProperty host,title |
+    sort name -Unique | sort risk | Format-Table -AutoSize | Out-String -Width 10000)
+$VulnDiff = $VulnDiff -split "`n" | foreach {
+    if ($_ -notmatch "^CVSS v2\.0 Base Score|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
+        "<font color='red'>$_</font>"
+    } else {
+        $_
+    }
+} | Out-String -Width 10000
+
+
+#### Modify $patchdiff variable to highlight critical risks and CVSS 10 vulnerabilities ####
+$patchdiff = '<pre>{0}</pre>' -f ($diffres | ? {$_.name -imatch 'update'} |
+    select * -ExcludeProperty title | sort name,host -Unique | Format-Table -AutoSize | Out-String -Width 10000)
+$patchdiff = $patchdiff -split "`n" | foreach {
+    if ($_ -notmatch "^Name|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
+        "<font color='red'>$_</font>"
+    } else {
+        $_
+    }
+} | Out-String -Width 10000
+#>
+
+#### Modify $vulnlist variable to highlight critical risks and CVSS 10 vulnerabilities ####
+$vulnlist = '<pre>{0}</pre>' -f ($res = NessusQuery -CVEScore 7 -CVE cve | select Name,CVE,'CVSS v2.0 Base Score',Risk | sort name -Unique | 
+    Format-Table -AutoSize | Out-String -Width 10000)
+$vulnlist = $vulnlist -split "`n" | foreach {
+    if ($_ -notmatch "^CVSS v2\.0 Base Score|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
+        "<font color='red'>$_</font>"
+    } else {
+        $_
+    }
+} | Out-String -Width 10000
+
+#### Modify $TopVulnerabilities variable to highlight critical risks and CVSS 10 vulnerabilities ####
+$TopVulnerabilities = '<pre>{0}</pre>' -f ($res = NessusQuery -CVEScore 7 |  ? {$_.name -notmatch 'Update'} |
+    sort name,host -Unique | Format-Table -AutoSize | Out-String -Width 10000)
+$TopVulnerabilities = $TopVulnerabilities -split "`n" | foreach {
+    if ($_ -notmatch "^CVSS v2\.0 Base Score|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
+        "<font color='red'>$_</font>"
+    } else {
+        $_
+    }
+} | Out-String -Width 10000
+
+#### Modify $MissingPatches variable to highlight critical risks and CVSS 10 vulnerabilities ####
+$MissingPatches = '<pre>{0}</pre>' -f ($res = NessusQuery -Name update | select * -ExcludeProperty title |
+    sort name,host -Unique | Format-Table -AutoSize | Out-String -Width 10000)
+$MissingPatches = $MissingPatches -split "`n" | foreach {
+    if ($_ -notmatch "^Name|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
+        "<font color='red'>$_</font>"
+    } else {
+        $_
+    }
+} | Out-String -Width 10000
+
+$MissingReboot = '<pre>{0}</pre>' -f ($res = NessusQuery -name reboot | select host,name | Format-Table -AutoSize | Out-String -Width 10000)
+
+$res = NessusQuery -Risk Medium,High,Critical -CVE cve | sort name -Unique
+$riskCritical = ($res.risk | where {$_ -imatch 'critical'}).count
+$riskhigh     = ($res.risk | where {$_ -imatch 'high'}).count
+$riskMedium   = ($res.risk | where {$_ -imatch 'medium'}).count
+$risktotal    = ($riskCritical + $riskhigh + $riskMedium)
+
+$squaresHTML = @"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    .container {
+      display: flex;
+      flex-direction: row; /* Align squares from left to right */
+      width: 100%;
+      height: 100%;
+    }
+
+    .square {
+      width: 100px;
+      height: 100px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px; /* Add margin between squares */
+      border-radius: 10px;
+      font-size: 24px; /* Increased font size */
+      font-weight: bold; /* Added font-weight */
+    }
+
+    .critical {
+      background-color: #e74c3c; /* Red for critical */
+      color: #fff;
+    }
+
+    .high {
+      background-color: #f39c12; /* Orange for high */
+      color: #fff;
+    }
+
+    .medium {
+      background-color: #3498db; /* Blue for medium */
+      color: #fff;
+    }
+
+    .total {
+      background-color: #229954; /* Green for total */
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="square critical">
+      Critical<br>$riskCritical
+    </div>
+    <div class="square high">
+      High<br>$riskhigh
+    </div>
+    <div class="square medium">
+      Medium<br>$riskMedium
+    </div>
+    <div class="square total">
+      Total<br>$risktotal
+    </div>
+  </div>
+</body>
+</html>
+"@
+
+#### Ceate the e-mail ####
+#### Define variables ####
+$mailfrom = 'MAIL_FROM_ADDRESS'
+$mailto = 'MAIL_TO_ADDRESS'
+$smtpserver = "SMTP_SERVER_ADDRESS"
+$subject = "SUBJECT"
+
+#$Attatchement = Get-ChildItem $HOME\Downloads\Nessusreport\nessus_*.zip
+$message   = "$squaresHTML <br />"
+$message  += "<h3 style='background-color:MidnightBlue;'>Top VLN's with CVSS v2.0 score 7 and above for all eviroments. $date</h3><br />"
+$message  += "$vulnlist"
+$message  += "<h3 style='background-color:MidnightBlue;'>Vulnerabilities/results with CVSS v2.0 score 7 and above for all eviroments. $date</h3><br />"
+$message  += "$TopVulnerabilities"
+#$message += "<h3>Changes from last scan for vulnerabilities:</h3><br />"
+#$message += $VulnDiff
+$message  += "<h3 style='background-color:MidnightBlue;'>Missing patches for all eviroments. $date</h3><br />"
+$message  += $MissingPatches
+$message  += "<h3 style='background-color:MidnightBlue;'>Servers that needs reboot after patching. $date</h3><br />"
+$message  += $MissingReboot
+#$message += "<h3>Changes from last scanfor patches:</h3><br />"
+#$message += $patchdiff
+
+$Mail = @{
+    To           = $mailto
+    From         = $mailfrom
+    Subject      = $subject
+    Body         = $message
+    Encoding     = "utf8"
+    SMTPServer   = $smtpserver
+    #Port         = 587
+    BodyAsHtml   = $true
+    #UseSsl       = $true
+    #Attachment = $Attatchement
+}
+
+Send-MailMessage @Mail
+
+exit

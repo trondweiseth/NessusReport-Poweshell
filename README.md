@@ -9,7 +9,7 @@ Edit NessusReports.ps1
         
         You can add multiple nessus servers separated with a comma: ('srv1','srv2')
   
-  [3] Get the API key for each server and run Get-NessusReports -AddAPIkeys
+  [3] Get the API key and secret for each server and run Get-NessusReports -AddAPIkeys
 
 Edit Mail_Reports.ps1
   

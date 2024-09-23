@@ -416,7 +416,7 @@ Function NessusQuery {
         ($_.description -imatch "$Description") -and
         ($_.host -imatch "$HostName") -and
         ($_.name -imatch "$Name") -and
-        ([decimal]$_.'CVSS v2.0 Base Score' -ge [int]$CVEScore) -and
+        ([decimal]$_.'CVSS v2.0 Base Score' -ge [decimal]$CVEScore) -and
         ($_.cve -imatch "$CVE") -and
         ($_.risk -imatch "$Risk") -and
         ($_.'Plugin output' -imatch "$PluginOutput") -and

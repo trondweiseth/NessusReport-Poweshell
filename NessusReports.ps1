@@ -28,9 +28,9 @@
 
 # Setting variable for scipt path
 $Global:scriptpath = $PSScriptRoot
-$Global:Server = "<NESSUS SERVER FQDN>"
+$Global:Server = "<NESSUS_SERVER_FQDM>"
 $Global:Base_URL   = "https://${Server}:8834"
-$Global:BasePath   = "$HOME\NessusReports"
+$Global:BasePath   = "$HOME"
 $Global:prevpath   = "$BasePath\PreviousNessusScan"
 
 # Nessus key pair
@@ -98,7 +98,7 @@ Function Get-NessusReports {
     # File structuring for diff comparison
     if ($RotateReports -eq 'Yes') {
         if (!$List -and $Format -ne 'html' -and !$AddAPIkeys) {
-            if (!(Test-Path $BasePath)) {[void](New-Item -Path $HOME -Name NessusReports -ItemType Directory)}
+            if (!(Test-Path $BasePath\NessusReports)) {[void](New-Item -Path $BasePath -Name NessusReports -ItemType Directory)}
             if (!(Test-Path $BasePath\CurrentNessusScan)) {[void](New-Item -Path $BasePath -Name CurrentNessusScan -ItemType Directory)}
             if (!(Test-Path $BasePath\PreviousNessusScan)) {[void](New-Item -Path $BasePath -Name PreviousNessusScan -ItemType Directory)}
             [void](Remove-Item -Path $BasePath\PreviousNessusScan\* -Force -Recurse)
@@ -259,7 +259,7 @@ Function Get-NessusReports {
                 }
 
                 # Returning output from srciptblock
-                $results | where {$_ -imatch 'pss'} | % {Write-Host -f Green $_}
+                $results | % {Write-Host -f Green $_}
 
                 # Clean up RunspacePool
                 $RunspacePool.Close()
@@ -291,7 +291,7 @@ Function Get-NessusReports {
                 }
 
                 # Returning output from srciptblock
-                return $results | where {$_ -imatch 'pss'}
+                return $results
 
                 # Clean up RunspacePool
                 $RunspacePool.Close()
@@ -310,8 +310,8 @@ Function Import-NessusReports {
         [string]$File,
         [switch]$Previous
     )
-    $path                                = "$HOME\NessusReports\CurrentNessusScan"
-    $prevpath                            = "$HOME\NessusReports\PreviousNessusScan"
+    $path                                = "$BasePath\NessusReports\CurrentNessusScan"
+    $prevpath                            = "$BasePath\NessusReports\PreviousNessusScan"
     if ($File) {$Global:NessusReports = Import-Csv $File}
     if($Previous) {$Global:NessusReports = Import-Csv -Path $prevpath (Get-ChildItem -Path $path -Filter '*.csv').FullName}
     else {$Global:NessusReports          = Import-Csv -Path (Get-ChildItem -Path $path -Filter '*.csv').FullName}
@@ -443,8 +443,8 @@ Function NessusQuery {
 # Comparing previous downloaded report(s) with last.
 Function Nessus-Diff {
 
-    $oldCsv = Get-ChildItem -Path "$HOME\NessusReports\PreviousNessusScan" -Filter *.csv | ForEach-Object { Import-Csv $_.FullName }
-    $newCsv = Get-ChildItem -Path "$HOME\NessusReports\CurrentNessusScan" -Filter *.csv | ForEach-Object { Import-Csv $_.FullName }
+    $oldCsv = Get-ChildItem -Path "$BasePath\NessusReports\PreviousNessusScan" -Filter *.csv | ForEach-Object { Import-Csv $_.FullName }
+    $newCsv = Get-ChildItem -Path "$BasePath\NessusReports\CurrentNessusScan" -Filter *.csv | ForEach-Object { Import-Csv $_.FullName }
 
     Compare-Object $oldCsv $newCsv -Property Host,name,cve,'CVSS v2.0 Base Score',Risk -PassThru |
         Select-Object @{Name='Change';Expression={if($_.SideIndicator -eq '<='){ 'Removed' } elseif($_.SideIndicator -eq '=>') { 'Added' } else { 'Changed' }}}, Host, name, cve, 'CVSS v2.0 Base Score', Risk
@@ -453,7 +453,7 @@ Function Nessus-Diff {
 
 # Exporting all nessus reports in to one single CSV file.
 Function Export-Nessusreports {
-    param([string]$Path = "$HOME")
+    param([string]$Path = "$BasePath")
     $date = get-date -Format "dd_MM_yyyy"
     if (!$NessusReports) { Import-NessusReports }
     $NessusReports | Export-Csv $Path\fullreport_$date.csv
@@ -528,7 +528,7 @@ Function PluginQuery {
         [String[]]$cvss_temporal_vector,
 
         [Parameter()]
-        [ValidateSet("local", "remote")]
+        [ValidateSet("local", "remote", "combined", "Settings", "Summary", "Third-Party", "Reputation")]
         [String[]]$plugin_type,
 
         [Parameter()]
@@ -587,6 +587,7 @@ Function PluginQuery {
         [String[]]$synopsis,
 
         [Parameter()]
+        [ValidateSet( "Info" , "Low", "Medium", "High" , "Critical")]
         [String[]]$risk_factor,
 
         [Parameter()]
@@ -599,6 +600,7 @@ Function PluginQuery {
         [String[]]$script_copyright,
 
         [Parameter()]
+        [ValidateSet("false", "true")]
         [String[]]$exploit_available,
 
         [Parameter()]
@@ -649,6 +651,10 @@ Function PluginQuery {
         [String[]]$patch_publication_date,
 
         [Parameter()]
+        [ValidateSet("true")]
+        [String[]]$unsupported_by_vendor,
+
+        [Parameter()]
         [String[]]$plugin_name,
 
         [Parameter()]
@@ -658,14 +664,14 @@ Function PluginQuery {
         [string[]]$Exclude = '!#¤%&/()=',
 
         [Parameter()]
-        [string[]]$Sort = 'cvss_base_score',
+        [string[]]$Sort = 'cvss3_base_score',
 
         [Parameter()]
         [switch]$OutputFull
     )
 
     Begin {
-        $jcontent = Get-Content $HOME\NessusReports\plugindetails.txt -Raw
+        $jcontent = Get-Content $BasePath\NessusReports\plugindetails.txt -Raw
         $plugindetails = $jcontent | ConvertFrom-Json
     }
 
@@ -676,7 +682,7 @@ Function PluginQuery {
                         'see_also', 'threat_intensity_last_28', 'cpe', 'age_of_vuln', 'synopsis', 'risk_factor', 'dependency', 'cvss_vector', 
                         'script_copyright', 'exploit_available', 'vendor_severity', 'product_coverage', 'vpr_score', 'plugin_publication_date', 
                         'cvssV3_impactScore', 'threat_sources_last_28', 'exploitability_ease', 'generated_plugin', 'fname', 'xref', 'plugin_modification_date', 
-                        'cvss3_temporal_vector', 'exploit_code_maturity', 'cwe', 'patch_publication_date', 'plugin_name', 'threat_recency', 'Exclude')
+                        'cvss3_temporal_vector', 'exploit_code_maturity', 'cwe', 'patch_publication_date', 'plugin_name', 'threat_recency', 'Exclude', 'unsupported_by_vendor')
 
         # Process parameters for multiple values, concatenate with pipes (|)
         $parameters | ForEach-Object {
@@ -737,6 +743,7 @@ Function PluginQuery {
             ($_.cwe -imatch "$cwe") -and
             ($_.patch_publication_date -imatch "$patch_publication_date") -and
             ($_.threat_recency -imatch "$threat_recency") -and
+            ($_.unsupported_by_vendor -imatch "$unsupported_by_vendor") -and
             ($_ -notmatch "$Exclude")
         }
 
@@ -744,7 +751,7 @@ Function PluginQuery {
         if ($OutputFull) {
             $res
         } else {
-            $res | Select-Object plugin_name, CVE, cvss3_base_score, plugin_publication_date, plugin_modification_date, exploit_available, risk_factor, exploit_code_maturity -Unique | Sort-Object $Sort -Descending
+            $res | Select-Object plugin_name, CVE, cvss3_base_score, risk_factor, exploit_available, exploit_code_maturity, plugin_type, plugin_publication_date, plugin_modification_date, vuln_publication_date | Sort-Object $Sort -Descending
         }
     }
 
@@ -756,5 +763,5 @@ Function PluginQuery {
 
 Function Export-Plunindetails() {
     $pluginoutput = $($ids = Nessusreport | select -ExpandProperty 'plugin id' -Unique;$ids | % {Get-PluginDetails $_})
-    $pluginoutput | ConvertTo-Json | Set-Content -Path $HOME\\NessusReports\plugindetails.txt
+    $pluginoutput | ConvertTo-Json | Set-Content -Path "$BasePath\NessusReports\plugindetails.txt"
 }

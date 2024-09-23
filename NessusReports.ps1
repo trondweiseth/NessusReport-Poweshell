@@ -760,7 +760,7 @@ Function PluginQuery {
 }
 
 
-Function Export-Plunindetails() {
+Function Export-Plugindetails() {
     $pluginoutput = $($ids = Nessusreport | select -ExpandProperty 'plugin id' -Unique;$ids | % {Get-PluginDetails $_})
     $pluginoutput | ConvertTo-Json | Set-Content -Path "$BasePath\NessusReports\plugindetails.txt"
 }

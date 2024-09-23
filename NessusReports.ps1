@@ -752,6 +752,16 @@ Function PluginQuery {
         } else {
             $res | Select-Object plugin_name, CVE, cvss3_base_score, risk_factor, exploit_available, exploit_code_maturity, plugin_type, plugin_publication_date, plugin_modification_date, vuln_publication_date | Sort-Object $Sort -Descending
         }
+        if ($CVSScalc) {
+            $vector_URL= 'https://www.first.org/cvss/calculator/3.0#'
+            $res | sort cve -Unique | % {
+                $cve = $_.cve
+                $vector = 
+                $_ | select -ExpandProperty cvss3_vector
+                $vector_link = "${vector_URL}$vector"
+                Write-Host "Link to CVSS calculator for ${cve} : $vector_link"
+            }
+        }
     }
 
     End {

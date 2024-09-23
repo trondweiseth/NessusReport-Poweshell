@@ -490,7 +490,7 @@ Function Get-PluginDetails() {
 
         try {
             # Fetch the plugin details from the API
-            $pluginres = Invoke-WebRequest @pluginids -ErrorAction Stop 
+            $pluginres = Invoke-WebRequest @pluginids -ErrorAction Stop -UseBasicParsing
         
             # Parse the JSON response
             $Json = $pluginres.Content | ConvertFrom-Json
@@ -758,7 +758,6 @@ Function PluginQuery {
         # Final block if needed
     }
 }
-
 
 Function Export-Plugindetails() {
     $pluginoutput = $($ids = Nessusreport | select -ExpandProperty 'plugin id' -Unique;$ids | % {Get-PluginDetails $_})

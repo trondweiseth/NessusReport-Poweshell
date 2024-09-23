@@ -298,7 +298,6 @@ Function Get-NessusReports {
                 $RunspacePool.Dispose()
 
                 }
-
         }
     }
 }

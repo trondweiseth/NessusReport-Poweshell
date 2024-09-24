@@ -764,20 +764,22 @@ Function PluginQuery {
             ($_ -notmatch "$Exclude")
         }
 
+
         # Calculate the date threshold if daysback is specified and greater than 0
         if ($daysback -gt 0) {
             $dateThreshold = (Get-Date).AddDays(-$daysback)
-    
+
             # Filter results based on the publication date threshold
             $res = $res | Where-Object {
                 $vulnDateString = $_.vuln_publication_date
 
                 # Attempt to parse the vuln_publication_date and handle any errors
                 try {
+                    # Use the original format 'yyyy/MM/dd' for parsing
                     $vulnDate = [datetime]::ParseExact($vulnDateString, 'yyyy/MM/dd', $null)
 
-                    # Compare with the date threshold
-                    $isRecent = $vulnDate -lt $dateThreshold  # Change to less than
+                    # Compare with the date threshold; keep entries newer than or equal to the threshold
+                    $isRecent = $vulnDate -ge $dateThreshold
                     $isRecent
                 } catch {
                     # Skip this entry if the date is invalid
@@ -800,25 +802,25 @@ Function PluginQuery {
                                                        @{Name="plugin_publication_date"; Expression={ 
                                                             if ($FormatDates) {
                                                                 # Format the date as "d MMMM yyyy"
-                                                                [datetime]::Parse($_.plugin_publication_date).ToString("d MMMM yyyy")
+                                                                [datetime]::ParseExact($_.plugin_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
                                                             } else {
-                                                                $_.plugin_publication_date
+                                                                $_.plugin_publication_date  # Return original format
                                                             }
                                                        }},
                                                        @{Name="plugin_modification_date"; Expression={ 
                                                             if ($FormatDates) {
                                                                 # Format the date as "d MMMM yyyy"
-                                                                [datetime]::Parse($_.plugin_modification_date).ToString("d MMMM yyyy")
+                                                                [datetime]::ParseExact($_.plugin_modification_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
                                                             } else {
-                                                                $_.plugin_modification_date
+                                                                $_.plugin_modification_date  # Return original format
                                                             }
                                                        }},
                                                        @{Name="vuln_publication_date"; Expression={ 
                                                             if ($FormatDates) {
                                                                 # Format the date as "d MMMM yyyy"
-                                                                [datetime]::Parse($_.vuln_publication_date).ToString("d MMMM yyyy")
+                                                                [datetime]::ParseExact($_.vuln_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
                                                             } else {
-                                                                $_.vuln_publication_date
+                                                                $_.vuln_publication_date  # Return original format
                                                             }
                                                        }} | 
                                                Sort-Object $Sort -Descending

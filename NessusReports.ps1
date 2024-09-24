@@ -678,12 +678,15 @@ Function PluginQuery {
         [switch]$hosts,
 
         [Parameter()]
-        [int]$daysback = 0,  # New parameter for filtering based on days back
+        [int]$daysback = 0,
+
+        [Parameter()]
+        [int]$OlderThanDays = 0,
         
         [Parameter()]
         [switch]$FormatDates
     )
-
+ 
     Begin {
         $jcontent = Get-Content $BasePath\NessusReports\plugindetails.txt -Raw
         $plugindetails = $jcontent | ConvertFrom-Json
@@ -781,6 +784,29 @@ Function PluginQuery {
                     # Compare with the date threshold; keep entries newer than or equal to the threshold
                     $isRecent = $vulnDate -ge $dateThreshold
                     $isRecent
+                } catch {
+                    # Skip this entry if the date is invalid
+                    $false
+                }
+            }
+        }
+
+        # Calculate the older date threshold if OlderThanDays is specified and greater than 0
+        if ($OlderThanDays -gt 0) {
+            $olderDateThreshold = (Get-Date).AddDays(-$OlderThanDays)
+
+            # Filter results based on the vuln_publication_date threshold
+            $res = $res | Where-Object {
+                $vulnDateString = $_.vuln_publication_date
+
+                # Attempt to parse the vuln_publication_date and handle any errors
+                try {
+                    # Use the original format 'yyyy/MM/dd' for parsing
+                    $vulnDate = [datetime]::ParseExact($vulnDateString, 'yyyy/MM/dd', $null)
+
+                    # Compare with the older date threshold; keep entries older than the threshold
+                    $isOlder = $vulnDate -lt $olderDateThreshold
+                    $isOlder
                 } catch {
                     # Skip this entry if the date is invalid
                     $false

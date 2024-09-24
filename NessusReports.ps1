@@ -773,14 +773,23 @@ Function PluginQuery {
             $res | select cve, plugin_name -Unique | ForEach-Object {
                 $CVEcode    = $_.cve
                 $pluginName = $_.plugin_name
-                $h = Nessusreport | where { $_.name -eq $pluginName -and $_.cve -eq $CVEcode } | select -ExpandProperty host -Unique
+                $h = Nessusreport | where { $_.name -eq $pluginName -and ($_.cve -eq $CVEcode -or -not $CVEcode) } | select -ExpandProperty host -Unique
         
-                # Display the affected hosts in the requested format
-                Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName' : $CVEcode"
+                # Output for plugins with CVEs
+                if ($CVEcode) {
+                    Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName' : $CVEcode"
+                } else {
+                    Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName' :"
+                }
 
-                # List each affected host with a preceding dash
-                foreach ($hostname in $h) {
-                    Write-Host " - $hostname"  # Prepend with dash and space for formatting
+                # Check if there are affected hosts
+                if ($h.Count -eq 0) {
+                    Write-Host " - No affected hosts found."
+                } else {
+                    # List each affected host with a preceding dash
+                    foreach ($hostname in $h) {
+                        Write-Host " - $hostname"  # Prepend with dash and space for formatting
+                    }
                 }
         
                 # Add a blank line after each plugin for better readability
@@ -788,7 +797,7 @@ Function PluginQuery {
             }
         }
     }
-    
+
     End {
         # Final block if needed
     }

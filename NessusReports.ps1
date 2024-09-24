@@ -678,7 +678,10 @@ Function PluginQuery {
         [switch]$hosts,
 
         [Parameter()]
-        [int]$daysback = 0  # New parameter for filtering based on days back
+        [int]$daysback = 0,  # New parameter for filtering based on days back
+        
+        [Parameter()]
+        [switch]$FormatDates
     )
 
     Begin {
@@ -793,11 +796,32 @@ Function PluginQuery {
                                                        risk_factor, 
                                                        exploit_available, 
                                                        exploit_code_maturity, 
-                                                       plugin_type, 
-                                                       @{Name="plugin_publication_date"; Expression={[datetime]::Parse($_.plugin_publication_date).ToString("d MMMM yyyy")}},
-                                                       @{Name="plugin_modification_date"; Expression={[datetime]::Parse($_.plugin_modification_date).ToString("d MMMM yyyy")}},
-                                                       @{Name="vuln_publication_date"; Expression={[datetime]::Parse($_.vuln_publication_date).ToString("d MMMM yyyy")}} | 
-                                           Sort-Object $Sort -Descending
+                                                       plugin_type,
+                                                       @{Name="plugin_publication_date"; Expression={ 
+                                                            if ($FormatDates) {
+                                                                # Format the date as "d MMMM yyyy"
+                                                                [datetime]::Parse($_.plugin_publication_date).ToString("d MMMM yyyy")
+                                                            } else {
+                                                                $_.plugin_publication_date
+                                                            }
+                                                       }},
+                                                       @{Name="plugin_modification_date"; Expression={ 
+                                                            if ($FormatDates) {
+                                                                # Format the date as "d MMMM yyyy"
+                                                                [datetime]::Parse($_.plugin_modification_date).ToString("d MMMM yyyy")
+                                                            } else {
+                                                                $_.plugin_modification_date
+                                                            }
+                                                       }},
+                                                       @{Name="vuln_publication_date"; Expression={ 
+                                                            if ($FormatDates) {
+                                                                # Format the date as "d MMMM yyyy"
+                                                                [datetime]::Parse($_.vuln_publication_date).ToString("d MMMM yyyy")
+                                                            } else {
+                                                                $_.vuln_publication_date
+                                                            }
+                                                       }} | 
+                                               Sort-Object $Sort -Descending
             $formattedResults
         }
 

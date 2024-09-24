@@ -669,7 +669,10 @@ Function PluginQuery {
         [switch]$OutputFull,
 
         [Parameter()]
-        [switch]$CVSScalc
+        [switch]$CVSScalc,
+
+        [Parameter()]
+        [switch]$hosts
     )
 
     Begin {
@@ -759,19 +762,28 @@ Function PluginQuery {
             $vector_URL= 'https://www.first.org/cvss/calculator/3.0#'
             $res | sort cve -Unique | % {
                 $cve = $_.cve
-                $vector = 
-                $_ | select -ExpandProperty cvss3_vector
+                $vector = $_ | select -ExpandProperty cvss3_vector
                 $vector_link = "${vector_URL}$vector"
                 Write-Host "Link to CVSS calculator for ${cve} : $vector_link"
             }
         }
+        if ($hosts) {
+            $res | select cve, plugin_name -Unique | % {
+                $CVEcode    = $_.cve
+                $pluginName = $_.plugin_name
+                $h = Nessusreport | where { $_.name -eq $pluginName -and $_.cve -eq $CVEcode } | select -ExpandProperty host -Unique
+                Write-Host -ForegroundColor Yellow "Affected hosts for $pluginName : $CVEcode"
+        
+                # Use $hostname instead of $host
+                foreach ($hostname in $h) {
+                    Write-Host $hostname
+                }
+            }
+        }
     }
 
-    End {
-        # Final block if needed
-    }
+    End {}
 }
-
 
 Function Export-Plunindetails() {
     $pluginoutput = $($ids = Nessusreport | select -ExpandProperty 'plugin id' -Unique;$ids | % {Get-PluginDetails $_})

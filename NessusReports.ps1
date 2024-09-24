@@ -766,6 +766,8 @@ Function PluginQuery {
                 $vector_link = "${vector_URL}$vector"
                 Write-Host "Link to CVSS calculator for ${cve} : $vector_link"
             }
+            # Add a blank line after each plugin for better readability
+            Write-Host ""  # This adds a single blank line after all hosts for the current plugin
         }
         if ($hosts) {
             $res | select cve, plugin_name -Unique | ForEach-Object {
@@ -773,19 +775,20 @@ Function PluginQuery {
                 $pluginName = $_.plugin_name
                 $h = Nessusreport | where { $_.name -eq $pluginName -and $_.cve -eq $CVEcode } | select -ExpandProperty host -Unique
         
-                Write-Host -ForegroundColor Yellow "Affected hosts for $pluginName : $CVEcode"
-        
-                # Use $hostname instead of $host
+                # Display the affected hosts in the requested format
+                Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName' : $CVEcode"
+
+                # List each affected host with a preceding dash
                 foreach ($hostname in $h) {
-                    Write-Host $hostname  # Only write the hostname, no extra empty line
+                    Write-Host " - $hostname"  # Prepend with dash and space for formatting
                 }
         
-                # Optionally add a break line after listing hosts for better readability
+                # Add a blank line after each plugin for better readability
                 Write-Host ""  # This adds a single blank line after all hosts for the current plugin
             }
         }
     }
-
+    
     End {
         # Final block if needed
     }

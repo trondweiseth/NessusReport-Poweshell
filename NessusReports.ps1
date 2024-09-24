@@ -779,7 +779,7 @@ Function PluginQuery {
                 if ($CVEcode) {
                     Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName' : $CVEcode"
                 } else {
-                    Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName' :"
+                    Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName'"
                 }
 
                 # Check if there are affected hosts

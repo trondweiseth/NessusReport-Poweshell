@@ -706,49 +706,49 @@ Function PluginQuery {
         # Query the plugins based on the provided parameters
         $res = $plugindetails | 
         Where-Object { 
-            ($_.plugin_name -imatch "$plugin_name") -and
-            ($_.CVE -imatch "$CVE") -and
-            ($_.plugin_type -imatch "$plugin_type") -and
-            ($_.vpr_score -imatch "$vpr_score" -or !$vpr_score) -and
-            ($_.cvssV3_impactScore -imatch "$cvssV3_impactScore") -and
-            ([decimal]$_.cvss3_base_score -ge [int]"$cvss3_base_score") -and
-            ($_.description -imatch "$description") -and
-            ($_.solution -imatch "$solution") -and
-            ($_.synopsis -imatch "$synopsis") -and
-            ($_.plugin_publication_date -imatch "$plugin_publication_date") -and
-            ($_.plugin_modification_date -imatch "$plugin_modification_date") -and
-            ($_.exploit_available -imatch "$exploit_available") -and
-            ($_.risk_factor -imatch "$risk_factor") -and
-            ($_.cvss_temporal_vector -imatch "$cvss_temporal_vector") -and
-            ([int]$_.cvss_base_score -ge [int]"$cvss_base_score") -and
-            ($_.cvss_score_source -imatch "$cvss_score_source") -and
-            ($_.cvss3_vector -imatch "$cvss3_vector") -and
-            ([decimal]$_.cvss3_temporal_score -ge [int]"$cvss3_temporal_score") -and
-            ($_.script_version -imatch "$script_version") -and
-            ($_.rhsa -imatch "$rhsa") -and
-            ($_.required_key -imatch "$required_key") -and
-            ($_.vuln_publication_date -imatch "$vuln_publication_date") -and
-            ([decimal]$_.cvss_temporal_score -ge [int]"$cvss_temporal_score") -and
-            ($_.see_also -imatch "$see_also") -and
-            ($_.threat_intensity_last_28 -imatch "$threat_intensity_last_28") -and
-            ($_.cpe -imatch "$cpe") -and
-            ($_.age_of_vuln -imatch "$age_of_vuln") -and
-            ($_.dependency -imatch "$dependency") -and
-            ($_.cvss_vector -imatch "$cvss_vector") -and
-            ($_.script_copyright -imatch "$script_copyright") -and
-            ($_.vendor_severity -imatch "$vendor_severity") -and
-            ($_.product_coverage -imatch "$product_coverage") -and
-            ($_.threat_sources_last_28 -imatch "$threat_sources_last_28") -and
-            ($_.exploitability_ease -imatch "$exploitability_ease") -and
-            ($_.generated_plugin -imatch "$generated_plugin") -and
-            ($_.fname -imatch "$fname") -and
-            ($_.xref -imatch "$xref") -and
-            ($_.cvss3_temporal_vector -imatch "$cvss3_temporal_vector") -and
-            ($_.exploit_code_maturity -imatch "$exploit_code_maturity") -and
-            ($_.cwe -imatch "$cwe") -and
-            ($_.patch_publication_date -imatch "$patch_publication_date") -and
-            ($_.threat_recency -imatch "$threat_recency") -and
-            ($_.unsupported_by_vendor -imatch "$unsupported_by_vendor") -and
+            ($_.plugin_name -imatch "$plugin_name" -or $_.plugin_name -eq "$plugin_name") -and
+            ($_.CVE -imatch "$CVE" -or $_.CVE -eq "$CVE") -and
+            ($_.plugin_type -imatch "$plugin_type" -or $_.plugin_type -eq "$plugin_type") -and
+            ($_.vpr_score -imatch "$vpr_score" -or !$vpr_score -or $_.vpr_score -eq "$vpr_score") -and
+            ($_.cvssV3_impactScore -imatch "$cvssV3_impactScore" -or $_.cvssV3_impactScore -eq "$cvssV3_impactScore") -and
+            ([decimal]$_.cvss3_base_score -ge [int]"$cvss3_base_score" -or $_.cvss3_base_score -eq [int]"$cvss3_base_score") -and
+            ($_.description -imatch "$description" -or $_.description -eq "$description") -and
+            ($_.solution -imatch "$solution" -or $_.solution -eq "$solution") -and
+            ($_.synopsis -imatch "$synopsis" -or $_.synopsis -eq "$synopsis") -and
+            ($_.plugin_publication_date -imatch "$plugin_publication_date" -or $_.plugin_publication_date -eq "$plugin_publication_date") -and
+            ($_.plugin_modification_date -imatch "$plugin_modification_date" -or $_.plugin_modification_date -eq "$plugin_modification_date") -and
+            ($_.exploit_available -imatch "$exploit_available" -or $_.exploit_available -eq "$exploit_available") -and
+            ($_.risk_factor -imatch "$risk_factor" -or $_.risk_factor -eq "$risk_factor") -and
+            ($_.cvss_temporal_vector -imatch "$cvss_temporal_vector" -or $_.cvss_temporal_vector -eq "$cvss_temporal_vector") -and
+            ([int]$_.cvss_base_score -ge [int]"$cvss_base_score" -or $_.cvss_base_score -eq [int]"$cvss_base_score") -and
+            ($_.cvss_score_source -imatch "$cvss_score_source" -or $_.cvss_score_source -eq "$cvss_score_source") -and
+            ($_.cvss3_vector -imatch "$cvss3_vector" -or $_.cvss3_vector -eq "$cvss3_vector") -and
+            ([decimal]$_.cvss3_temporal_score -ge [int]"$cvss3_temporal_score" -or $_.cvss3_temporal_score -eq [int]"$cvss3_temporal_score") -and
+            ($_.script_version -imatch "$script_version" -or $_.script_version -eq "$script_version") -and
+            ($_.rhsa -imatch "$rhsa" -or $_.rhsa -eq "$rhsa") -and
+            ($_.required_key -imatch "$required_key" -or $_.required_key -eq "$required_key") -and
+            ($_.vuln_publication_date -imatch "$vuln_publication_date" -or $_.vuln_publication_date -eq "$vuln_publication_date") -and
+            ([decimal]$_.cvss_temporal_score -ge [int]"$cvss_temporal_score" -or $_.cvss_temporal_score -eq [int]"$cvss_temporal_score") -and
+            ($_.see_also -imatch "$see_also" -or $_.see_also -eq "$see_also") -and
+            ($_.threat_intensity_last_28 -imatch "$threat_intensity_last_28" -or $_.threat_intensity_last_28 -eq "$threat_intensity_last_28") -and
+            ($_.cpe -imatch "$cpe" -or $_.cpe -eq "$cpe") -and
+            ($_.age_of_vuln -imatch "$age_of_vuln" -or $_.age_of_vuln -eq "$age_of_vuln") -and
+            ($_.dependency -imatch "$dependency" -or $_.dependency -eq "$dependency") -and
+            ($_.cvss_vector -imatch "$cvss_vector" -or $_.cvss_vector -eq "$cvss_vector") -and
+            ($_.script_copyright -imatch "$script_copyright" -or $_.script_copyright -eq "$script_copyright") -and
+            ($_.vendor_severity -imatch "$vendor_severity" -or $_.vendor_severity -eq "$vendor_severity") -and
+            ($_.product_coverage -imatch "$product_coverage" -or $_.product_coverage -eq "$product_coverage") -and
+            ($_.threat_sources_last_28 -imatch "$threat_sources_last_28" -or $_.threat_sources_last_28 -eq "$threat_sources_last_28") -and
+            ($_.exploitability_ease -imatch "$exploitability_ease" -or $_.exploitability_ease -eq "$exploitability_ease") -and
+            ($_.generated_plugin -imatch "$generated_plugin" -or $_.generated_plugin -eq "$generated_plugin") -and
+            ($_.fname -imatch "$fname" -or $_.fname -eq "$fname") -and
+            ($_.xref -imatch "$xref" -or $_.xref -eq "$xref") -and
+            ($_.cvss3_temporal_vector -imatch "$cvss3_temporal_vector" -or $_.cvss3_temporal_vector -eq "$cvss3_temporal_vector") -and
+            ($_.exploit_code_maturity -imatch "$exploit_code_maturity" -or $_.exploit_code_maturity -eq "$exploit_code_maturity") -and
+            ($_.cwe -imatch "$cwe" -or $_.cwe -eq "$cwe") -and
+            ($_.patch_publication_date -imatch "$patch_publication_date" -or $_.patch_publication_date -eq "$patch_publication_date") -and
+            ($_.threat_recency -imatch "$threat_recency" -or $_.threat_recency -eq "$threat_recency") -and
+            ($_.unsupported_by_vendor -imatch "$unsupported_by_vendor" -or $_.unsupported_by_vendor -eq "$unsupported_by_vendor") -and
             ($_ -notmatch "$Exclude")
         }
 
@@ -768,21 +768,27 @@ Function PluginQuery {
             }
         }
         if ($hosts) {
-            $res | select cve, plugin_name -Unique | % {
+            $res | select cve, plugin_name -Unique | ForEach-Object {
                 $CVEcode    = $_.cve
                 $pluginName = $_.plugin_name
                 $h = Nessusreport | where { $_.name -eq $pluginName -and $_.cve -eq $CVEcode } | select -ExpandProperty host -Unique
+        
                 Write-Host -ForegroundColor Yellow "Affected hosts for $pluginName : $CVEcode"
         
                 # Use $hostname instead of $host
                 foreach ($hostname in $h) {
-                    Write-Host $hostname
+                    Write-Host $hostname  # Only write the hostname, no extra empty line
                 }
+        
+                # Optionally add a break line after listing hosts for better readability
+                Write-Host ""  # This adds a single blank line after all hosts for the current plugin
             }
         }
     }
 
-    End {}
+    End {
+        # Final block if needed
+    }
 }
 
 Function Export-Plunindetails() {

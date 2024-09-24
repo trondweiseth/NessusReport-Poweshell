@@ -555,7 +555,10 @@ Function PluginQuery {
         [String[]]$script_version,
 
         [Parameter()]
-        [String[]]$cvss3_base_score,
+        [decimal]$cvss3_base_score_greater = 0.0,  # Greater than this score
+
+        [Parameter()]
+        [decimal]$cvss3_base_score_less = 10.0,  # Less than this score (or set a higher default)
 
         [Parameter()]
         [String[]]$rhsa,
@@ -663,7 +666,7 @@ Function PluginQuery {
         [string[]]$Exclude = '!#¤%&/()=',
 
         [Parameter()]
-        [string[]]$Sort = 'cvss3_base_score',
+        [string[]]$Sort = 'plugin_name',
 
         [Parameter()]
         [switch]$OutputFull,
@@ -672,7 +675,10 @@ Function PluginQuery {
         [switch]$CVSScalc,
 
         [Parameter()]
-        [switch]$hosts
+        [switch]$hosts,
+
+        [Parameter()]
+        [int]$daysback = 0  # New parameter for filtering based on days back
     )
 
     Begin {
@@ -683,7 +689,7 @@ Function PluginQuery {
     Process {
         # Define parameters to include in the filtering
         $parameters = @('cvss_temporal_vector', 'plugin_type', 'description', 'cvss_base_score', 'cvss_score_source', 'cvss3_vector', 'CVE', 'solution', 
-                        'cvss3_temporal_score', 'script_version', 'cvss3_base_score', 'rhsa', 'required_key', 'vuln_publication_date', 'cvss_temporal_score',
+                        'cvss3_temporal_score', 'script_version', 'cvss3_base_score_greater', 'cvss3_base_score_less' , 'rhsa', 'required_key', 'vuln_publication_date', 'cvss_temporal_score',
                         'see_also', 'threat_intensity_last_28', 'cpe', 'age_of_vuln', 'synopsis', 'risk_factor', 'dependency', 'cvss_vector', 
                         'script_copyright', 'exploit_available', 'vendor_severity', 'product_coverage', 'vpr_score', 'plugin_publication_date', 
                         'cvssV3_impactScore', 'threat_sources_last_28', 'exploitability_ease', 'generated_plugin', 'fname', 'xref', 'plugin_modification_date', 
@@ -709,9 +715,12 @@ Function PluginQuery {
             ($_.plugin_name -imatch "$plugin_name" -or $_.plugin_name -eq "$plugin_name") -and
             ($_.CVE -imatch "$CVE" -or $_.CVE -eq "$CVE") -and
             ($_.plugin_type -imatch "$plugin_type" -or $_.plugin_type -eq "$plugin_type") -and
-            ($_.vpr_score -imatch "$vpr_score" -or !$vpr_score -or $_.vpr_score -eq "$vpr_score") -and
+            ($_.vpr_score -imatch "$vpr_score" -or -not $vpr_score -or $_.vpr_score -eq "$vpr_score") -and
             ($_.cvssV3_impactScore -imatch "$cvssV3_impactScore" -or $_.cvssV3_impactScore -eq "$cvssV3_impactScore") -and
-            ([decimal]$_.cvss3_base_score -ge [int]"$cvss3_base_score" -or $_.cvss3_base_score -eq [int]"$cvss3_base_score") -and
+            # Handle the cvss3_base_score greater condition
+            ([decimal]$_.cvss3_base_score -gt $cvss3_base_score_greater -or $cvss3_base_score_greater -eq 0.0) -and
+            # Handle the cvss3_base_score less condition
+            ([decimal]$_.cvss3_base_score -lt $cvss3_base_score_less -or $cvss3_base_score_less -eq 10.0) -and
             ($_.description -imatch "$description" -or $_.description -eq "$description") -and
             ($_.solution -imatch "$solution" -or $_.solution -eq "$solution") -and
             ($_.synopsis -imatch "$synopsis" -or $_.synopsis -eq "$synopsis") -and
@@ -720,15 +729,15 @@ Function PluginQuery {
             ($_.exploit_available -imatch "$exploit_available" -or $_.exploit_available -eq "$exploit_available") -and
             ($_.risk_factor -imatch "$risk_factor" -or $_.risk_factor -eq "$risk_factor") -and
             ($_.cvss_temporal_vector -imatch "$cvss_temporal_vector" -or $_.cvss_temporal_vector -eq "$cvss_temporal_vector") -and
-            ([int]$_.cvss_base_score -ge [int]"$cvss_base_score" -or $_.cvss_base_score -eq [int]"$cvss_base_score") -and
+            ([int]$_.cvss_base_score -ge $cvss_base_score -or $_.cvss_base_score -eq $cvss_base_score) -and
             ($_.cvss_score_source -imatch "$cvss_score_source" -or $_.cvss_score_source -eq "$cvss_score_source") -and
             ($_.cvss3_vector -imatch "$cvss3_vector" -or $_.cvss3_vector -eq "$cvss3_vector") -and
-            ([decimal]$_.cvss3_temporal_score -ge [int]"$cvss3_temporal_score" -or $_.cvss3_temporal_score -eq [int]"$cvss3_temporal_score") -and
+            ([decimal]$_.cvss3_temporal_score -ge $cvss3_temporal_score -or $_.cvss3_temporal_score -eq $cvss3_temporal_score) -and
             ($_.script_version -imatch "$script_version" -or $_.script_version -eq "$script_version") -and
             ($_.rhsa -imatch "$rhsa" -or $_.rhsa -eq "$rhsa") -and
             ($_.required_key -imatch "$required_key" -or $_.required_key -eq "$required_key") -and
             ($_.vuln_publication_date -imatch "$vuln_publication_date" -or $_.vuln_publication_date -eq "$vuln_publication_date") -and
-            ([decimal]$_.cvss_temporal_score -ge [int]"$cvss_temporal_score" -or $_.cvss_temporal_score -eq [int]"$cvss_temporal_score") -and
+            ([decimal]$_.cvss_temporal_score -ge $cvss_temporal_score -or $_.cvss_temporal_score -eq $cvss_temporal_score) -and
             ($_.see_also -imatch "$see_also" -or $_.see_also -eq "$see_also") -and
             ($_.threat_intensity_last_28 -imatch "$threat_intensity_last_28" -or $_.threat_intensity_last_28 -eq "$threat_intensity_last_28") -and
             ($_.cpe -imatch "$cpe" -or $_.cpe -eq "$cpe") -and
@@ -752,12 +761,46 @@ Function PluginQuery {
             ($_ -notmatch "$Exclude")
         }
 
+        # Calculate the date threshold if daysback is specified and greater than 0
+        if ($daysback -gt 0) {
+            $dateThreshold = (Get-Date).AddDays(-$daysback)
+    
+            # Filter results based on the publication date threshold
+            $res = $res | Where-Object {
+                $vulnDateString = $_.vuln_publication_date
+
+                # Attempt to parse the vuln_publication_date and handle any errors
+                try {
+                    $vulnDate = [datetime]::ParseExact($vulnDateString, 'yyyy/MM/dd', $null)
+
+                    # Compare with the date threshold
+                    $isRecent = $vulnDate -lt $dateThreshold  # Change to less than
+                    $isRecent
+                } catch {
+                    # Skip this entry if the date is invalid
+                    $false
+                }
+            }
+        }
+
         # Output the filtered results
         if ($OutputFull) {
             $res
         } else {
-            $res | Select-Object plugin_name, CVE, cvss3_base_score, risk_factor, exploit_available, exploit_code_maturity, plugin_type, plugin_publication_date, plugin_modification_date, vuln_publication_date | Sort-Object $Sort -Descending
+            $formattedResults = $res | Select-Object plugin_name, 
+                                                       CVE, 
+                                                       cvss3_base_score, 
+                                                       risk_factor, 
+                                                       exploit_available, 
+                                                       exploit_code_maturity, 
+                                                       plugin_type, 
+                                                       @{Name="plugin_publication_date"; Expression={[datetime]::Parse($_.plugin_publication_date).ToString("d MMMM yyyy")}},
+                                                       @{Name="plugin_modification_date"; Expression={[datetime]::Parse($_.plugin_modification_date).ToString("d MMMM yyyy")}},
+                                                       @{Name="vuln_publication_date"; Expression={[datetime]::Parse($_.vuln_publication_date).ToString("d MMMM yyyy")}} | 
+                                           Sort-Object $Sort -Descending
+            $formattedResults
         }
+
         if ($CVSScalc) {
             $vector_URL= 'https://www.first.org/cvss/calculator/3.0#'
             $res | sort cve -Unique | % {
@@ -766,15 +809,15 @@ Function PluginQuery {
                 $vector_link = "${vector_URL}$vector"
                 Write-Host "Link to CVSS calculator for ${cve} : $vector_link"
             }
-            # Add a blank line after each plugin for better readability
-            Write-Host ""  # This adds a single blank line after all hosts for the current plugin
+            Write-Host ""  # Blank line for readability
         }
+
         if ($hosts) {
             $res | select cve, plugin_name -Unique | ForEach-Object {
                 $CVEcode    = $_.cve
                 $pluginName = $_.plugin_name
                 $h = Nessusreport | where { $_.name -eq $pluginName -and ($_.cve -eq $CVEcode -or -not $CVEcode) } | select -ExpandProperty host -Unique
-        
+
                 # Output for plugins with CVEs
                 if ($CVEcode) {
                     Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName' : $CVEcode"
@@ -791,9 +834,8 @@ Function PluginQuery {
                         Write-Host " - $hostname"  # Prepend with dash and space for formatting
                     }
                 }
-        
-                # Add a blank line after each plugin for better readability
-                Write-Host ""  # This adds a single blank line after all hosts for the current plugin
+
+                Write-Host ""  # Blank line for readability
             }
         }
     }

@@ -314,7 +314,7 @@ Function Import-NessusReports {
     if ($File) {$Global:NessusReports = Import-Csv $File}
     if($Previous) {$Global:NessusReports = Import-Csv -Path $prevpath (Get-ChildItem -Path $path -Filter '*.csv').FullName}
     else {$Global:NessusReports          = Import-Csv -Path (Get-ChildItem -Path $path -Filter '*.csv').FullName}
-    Write-Host -ForegroundColor Cyan 'Nessusreports imported to function Nessusreport'
+    #Write-Host -ForegroundColor Cyan 'Nessusreports imported to function Nessusreport'
 }
 
 # Output nessusreport(s)

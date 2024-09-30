@@ -327,6 +327,7 @@ Function Nessusreport {
 # Predefined parsing through nessus report(s)
 $Global:SortValidSet = @('Host', 'Name', 'risk', 'CVE', "'CVSS v2.0 Base Score'")
 $Global:RiskValidateSet = @('Critical', 'High', 'Medium', 'Low', 'None')
+
 Function NessusQuery {
     [CmdletBinding()]
     param
@@ -440,7 +441,8 @@ Function NessusQuery {
         ($_.Protocol -imatch "$Protocol") -and
         ($_.'plugin id' -imatch "$PluginID") -and
         ($_.Port -imatch "$Port") -and
-        ($_ -notmatch "$Exclude")
+        ($_ -notmatch "$Exclude") -and
+        ($_.host -notmatch "c1w")
     }
 
     if ($FixedVersion) {
@@ -790,6 +792,51 @@ Function PluginQuery {
             ($_ -notmatch "$Exclude")
         }
 
+        # Output the filtered results
+        if ($OutputFull) {
+            $res
+        } else {
+            $formattedResults = $res | Select-Object plugin_name, 
+                                                       CVE, 
+                                                       cvss3_base_score, 
+                                                       risk_factor, 
+                                                       exploit_available, 
+                                                       exploit_code_maturity, 
+                                                       @{Name="patch_publication_date"; Expression={ 
+                                                            if ($FormatDates) {
+                                                                # Format the date as "d MMMM yyyy"
+                                                                [datetime]::ParseExact($_.patch_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
+                                                            } else {
+                                                                $_.patch_publication_date  # Return original format
+                                                            }
+                                                       }},
+                                                       @{Name="plugin_publication_date"; Expression={ 
+                                                            if ($FormatDates) {
+                                                                # Format the date as "d MMMM yyyy"
+                                                                [datetime]::ParseExact($_.plugin_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
+                                                            } else {
+                                                                $_.plugin_publication_date  # Return original format
+                                                            }
+                                                       }},
+                                                       @{Name="plugin_modification_date"; Expression={ 
+                                                            if ($FormatDates) {
+                                                                # Format the date as "d MMMM yyyy"
+                                                                [datetime]::ParseExact($_.plugin_modification_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
+                                                            } else {
+                                                                $_.plugin_modification_date  # Return original format
+                                                            }
+                                                       }},
+                                                       @{Name="vuln_publication_date"; Expression={ 
+                                                            if ($FormatDates) {
+                                                                # Format the date as "d MMMM yyyy"
+                                                                [datetime]::ParseExact($_.vuln_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
+                                                            } else {
+                                                                $_.vuln_publication_date  # Return original format
+                                                            }
+                                                       }} | 
+                                               Sort-Object $Sort -Descending
+            $formattedResults
+        }
 
         # Calculate the date threshold if daysback is specified and greater than 0
         if ($daysback -gt 0) {
@@ -837,45 +884,6 @@ Function PluginQuery {
             }
         }
 
-        # Output the filtered results
-        if ($OutputFull) {
-            $res
-        } else {
-            $formattedResults = $res | Select-Object plugin_name, 
-                                                       CVE, 
-                                                       cvss3_base_score, 
-                                                       risk_factor, 
-                                                       exploit_available, 
-                                                       exploit_code_maturity, 
-                                                       plugin_type,
-                                                       @{Name="plugin_publication_date"; Expression={ 
-                                                            if ($FormatDates) {
-                                                                # Format the date as "d MMMM yyyy"
-                                                                [datetime]::ParseExact($_.plugin_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
-                                                            } else {
-                                                                $_.plugin_publication_date  # Return original format
-                                                            }
-                                                       }},
-                                                       @{Name="plugin_modification_date"; Expression={ 
-                                                            if ($FormatDates) {
-                                                                # Format the date as "d MMMM yyyy"
-                                                                [datetime]::ParseExact($_.plugin_modification_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
-                                                            } else {
-                                                                $_.plugin_modification_date  # Return original format
-                                                            }
-                                                       }},
-                                                       @{Name="vuln_publication_date"; Expression={ 
-                                                            if ($FormatDates) {
-                                                                # Format the date as "d MMMM yyyy"
-                                                                [datetime]::ParseExact($_.vuln_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
-                                                            } else {
-                                                                $_.vuln_publication_date  # Return original format
-                                                            }
-                                                       }} | 
-                                               Sort-Object $Sort -Descending
-            $formattedResults
-        }
-
         if ($CVSScalc) {
             $vector_URL = 'https://www.first.org/cvss/calculator/3.0#'
             $res | sort cve -Unique | % {
@@ -904,32 +912,47 @@ Function PluginQuery {
             Write-Host ""  # Blank line for readability
         }
 
+        # Ensure you run this in a clean environment with necessary context
         if ($hosts) {
-            $res | select cve, plugin_name -Unique | ForEach-Object {
+            # Collect results for output later
+            $output = @()
+
+            # Select unique CVE and plugin names
+            $res | Select-Object -Property cve, plugin_name -Unique | ForEach-Object {
                 $CVEcode    = $_.cve
                 $pluginName = $_.plugin_name
-                $h = Nessusreport | where { $_.name -eq $pluginName -and ($_.cve -eq $CVEcode -or -not $CVEcode) } | select -ExpandProperty host -Unique
 
-                # Output for plugins with CVEs
+                # Query for hosts based on plugin name and CVE conditions
+                $h = Nessusreport | Where-Object {
+                    $_.name -eq $pluginName -and 
+                    ($_.cve -eq $CVEcode -or -not $CVEcode) -and 
+                    ($_.host -notmatch "c1w")
+                } | Select-Object -ExpandProperty host -Unique
+
+                # Prepare output for plugins with CVEs
                 if ($CVEcode) {
-                    Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName' : $CVEcode"
+                    $output += "Affected hosts for '$pluginName' : $CVEcode"
                 } else {
-                    Write-Host -ForegroundColor Yellow "Affected hosts for '$pluginName'"
+                    $output += "Affected hosts for '$pluginName'"
                 }
 
                 # Check if there are affected hosts
                 if ($h.Count -eq 0) {
-                    Write-Host " - No affected hosts found."
+                    $output += " - No affected hosts found."
                 } else {
                     # List each affected host with a preceding dash
                     foreach ($hostname in $h) {
-                        Write-Output " - $hostname"  # Prepend with dash and space for formatting
+                        $output += " - $hostname"  # Prepend with dash and space for formatting
                     }
                 }
 
-                Write-Host ""  # Blank line for readability
+                $output += ""  # Blank line for readability
             }
+
+            # Output the results after processing
+            $output | ForEach-Object { Write-Host $_ }
         }
+
     }
 
     End {

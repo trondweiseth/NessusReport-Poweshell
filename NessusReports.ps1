@@ -259,7 +259,7 @@ Function Get-NessusReports {
                 }
 
                 # Returning output from srciptblock
-                $results | % {Write-Host -f Green $_}
+                $results | where {$_ -imatch 'pss'} | % {Write-Host -f Green $_}
 
                 # Clean up RunspacePool
                 $RunspacePool.Close()
@@ -291,13 +291,14 @@ Function Get-NessusReports {
                 }
 
                 # Returning output from srciptblock
-                return $results
+                return $results | where {$_ -imatch 'pss'}
 
                 # Clean up RunspacePool
                 $RunspacePool.Close()
                 $RunspacePool.Dispose()
 
                 }
+
         }
     }
 }
@@ -411,12 +412,26 @@ Function NessusQuery {
         }
     }
 
+    # Escape the variables used with -imatch
+    $Description = [regex]::Escape($Description)
+    $HostName = [regex]::Escape($HostName)
+    $Name = [regex]::Escape($Name)
+    $CVE = [regex]::Escape($CVE)
+    $Risk = [regex]::Escape($Risk)
+    $PluginOutput = [regex]::Escape($PluginOutput)
+    $Solution = [regex]::Escape($Solution)
+    $Synopsis = [regex]::Escape($Synopsis)
+    $Protocol = [regex]::Escape($Protocol)
+    $PluginID = [regex]::Escape($PluginID)
+    $Port = [regex]::Escape($Port)
+    $Exclude = [regex]::Escape($Exclude)
+
     $res = Nessusreport | 
     Where-Object { 
-        ($_.description -imatch "$Description") -and
+        ($_.description -imatch "$Description"-or $_.description -eq "$Description") -and
         ($_.host -imatch "$HostName") -and
-        ($_.name -imatch "$Name") -and
-        ([decimal]$_.'CVSS v2.0 Base Score' -ge [decimal]$CVEScore) -and
+        ($_.name -imatch "$Name" -or $_.name -eq "$Name") -and
+        ([decimal]$_.'CVSS v2.0 Base Score' -ge [int]$CVEScore) -and
         ($_.cve -imatch "$CVE") -and
         ($_.risk -imatch "$Risk") -and
         ($_.'Plugin output' -imatch "$PluginOutput") -and
@@ -490,7 +505,7 @@ Function Get-PluginDetails() {
 
         try {
             # Fetch the plugin details from the API
-            $pluginres = Invoke-WebRequest @pluginids -ErrorAction Stop -UseBasicParsing
+            $pluginres = Invoke-WebRequest @pluginids -ErrorAction Stop 
         
             # Parse the JSON response
             $Json = $pluginres.Content | ConvertFrom-Json
@@ -684,7 +699,10 @@ Function PluginQuery {
         [int]$OlderThanDays = 0,
         
         [Parameter()]
-        [switch]$FormatDates
+        [switch]$FormatDates,
+
+        [Parameter()]
+        [switch]$LinkToPlugin
     )
  
     Begin {
@@ -714,6 +732,11 @@ Function PluginQuery {
                 Clear-Variable value
             }
         }
+
+        # Escape the variables used with -imatch
+        $plugin_name = [regex]::Escape($plugin_name)
+        $description = [regex]::Escape($description)
+        $solution = [regex]::Escape($solution)
 
         # Query the plugins based on the provided parameters
         $res = $plugindetails | 
@@ -854,12 +877,29 @@ Function PluginQuery {
         }
 
         if ($CVSScalc) {
-            $vector_URL= 'https://www.first.org/cvss/calculator/3.0#'
+            $vector_URL = 'https://www.first.org/cvss/calculator/3.0#'
             $res | sort cve -Unique | % {
-                $cve = $_.cve
-                $vector = $_ | select -ExpandProperty cvss3_vector
-                $vector_link = "${vector_URL}$vector"
-                Write-Host "Link to CVSS calculator for ${cve} : $vector_link"
+                if ($_.cvss3_vector) {  # Check if 'cvss3_vector' is present
+                    $cve = $_.cve
+                    $vector = $_.cvss3_vector  # Directly access 'cvss3_vector'
+                    $vector_link = "${vector_URL}$vector"
+                    Write-Output "Link to CVSS calculator for ${cve} : $vector_link"
+                }
+            }
+            Write-Host ""  # Blank line for readability
+        }
+
+        if ($LinkToPlugin) {
+            $plugin_URL = 'https://www.tenable.com/plugins/nessus/'
+            $res | sort cve -Unique | % {
+                if ($_.cve) {  # Check if 'cve' is present
+                    $cve = $_.cve
+                    $pluginID = $(NessusQuery -Name $_.plugin_name | sort name -Unique | select -ExpandProperty 'plugin id' -ErrorAction SilentlyContinue)
+                    if ($pluginID) {  # Check if 'plugin id' is present
+                        $plugin_link = "${plugin_URL}$pluginID"
+                        Write-Output "Link to nessus plugin for ${cve} : $plugin_link"
+                    }
+                }
             }
             Write-Host ""  # Blank line for readability
         }
@@ -883,7 +923,7 @@ Function PluginQuery {
                 } else {
                     # List each affected host with a preceding dash
                     foreach ($hostname in $h) {
-                        Write-Host " - $hostname"  # Prepend with dash and space for formatting
+                        Write-Output " - $hostname"  # Prepend with dash and space for formatting
                     }
                 }
 
@@ -896,6 +936,7 @@ Function PluginQuery {
         # Final block if needed
     }
 }
+
 
 Function Export-Plugindetails() {
     $pluginoutput = $($ids = Nessusreport | select -ExpandProperty 'plugin id' -Unique;$ids | % {Get-PluginDetails $_})

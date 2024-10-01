@@ -18,7 +18,7 @@
 .OUTPUTS
     None
 .NOTES
-    Version:        1.0
+    Version:        3.0
     Author:         Trond Weiseth
     Creation Date:  29.08.2022
     Purpose/Change: Initial script development

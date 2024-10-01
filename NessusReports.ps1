@@ -768,73 +768,76 @@ Function PluginQuery {
             ($_.rhsa -imatch "$rhsa" -or $_.rhsa -eq "$rhsa") -and
             ($_.required_key -imatch "$required_key" -or $_.required_key -eq "$required_key") -and
             ($_.vuln_publication_date -imatch "$vuln_publication_date" -or $_.vuln_publication_date -eq "$vuln_publication_date") -and
-            ([decimal]$_.cvss_temporal_score -ge $cvss_temporal_score -or $_.cvss_temporal_score -eq $cvss_temporal_score) -and
             ($_.see_also -imatch "$see_also" -or $_.see_also -eq "$see_also") -and
-            ($_.threat_intensity_last_28 -imatch "$threat_intensity_last_28" -or $_.threat_intensity_last_28 -eq "$threat_intensity_last_28") -and
-            ($_.cpe -imatch "$cpe" -or $_.cpe -eq "$cpe") -and
-            ($_.age_of_vuln -imatch "$age_of_vuln" -or $_.age_of_vuln -eq "$age_of_vuln") -and
-            ($_.dependency -imatch "$dependency" -or $_.dependency -eq "$dependency") -and
-            ($_.cvss_vector -imatch "$cvss_vector" -or $_.cvss_vector -eq "$cvss_vector") -and
-            ($_.script_copyright -imatch "$script_copyright" -or $_.script_copyright -eq "$script_copyright") -and
-            ($_.vendor_severity -imatch "$vendor_severity" -or $_.vendor_severity -eq "$vendor_severity") -and
-            ($_.product_coverage -imatch "$product_coverage" -or $_.product_coverage -eq "$product_coverage") -and
-            ($_.threat_sources_last_28 -imatch "$threat_sources_last_28" -or $_.threat_sources_last_28 -eq "$threat_sources_last_28") -and
-            ($_.exploitability_ease -imatch "$exploitability_ease" -or $_.exploitability_ease -eq "$exploitability_ease") -and
-            ($_.generated_plugin -imatch "$generated_plugin" -or $_.generated_plugin -eq "$generated_plugin") -and
-            ($_.fname -imatch "$fname" -or $_.fname -eq "$fname") -and
-            ($_.xref -imatch "$xref" -or $_.xref -eq "$xref") -and
-            ($_.cvss3_temporal_vector -imatch "$cvss3_temporal_vector" -or $_.cvss3_temporal_vector -eq "$cvss3_temporal_vector") -and
-            ($_.exploit_code_maturity -imatch "$exploit_code_maturity" -or $_.exploit_code_maturity -eq "$exploit_code_maturity") -and
-            ($_.cwe -imatch "$cwe" -or $_.cwe -eq "$cwe") -and
-            ($_.patch_publication_date -imatch "$patch_publication_date" -or $_.patch_publication_date -eq "$patch_publication_date") -and
-            ($_.threat_recency -imatch "$threat_recency" -or $_.threat_recency -eq "$threat_recency") -and
-            ($_.unsupported_by_vendor -imatch "$unsupported_by_vendor" -or $_.unsupported_by_vendor -eq "$unsupported_by_vendor") -and
             ($_ -notmatch "$Exclude")
         }
 
-        # Output the filtered results
+        # Filter based on $daysback and $OlderThanDays conditions
+        if ($daysback -gt 0) {
+            $dateThreshold = (Get-Date).AddDays(-$daysback)
+            # Filter results newer than $daysback
+            $res = $res | Where-Object {
+                try {
+                    $vulnDate = [datetime]::ParseExact($_.vuln_publication_date, 'yyyy/MM/dd', $null)
+                    $vulnDate -ge $dateThreshold
+                } catch {
+                    $false
+                }
+            }
+        }
+
+        if ($OlderThanDays -gt 0) {
+            $olderDateThreshold = (Get-Date).AddDays(-$OlderThanDays)
+            # Filter results older than $OlderThanDays
+            $res = $res | Where-Object {
+                try {
+                    $vulnDate = [datetime]::ParseExact($_.vuln_publication_date, 'yyyy/MM/dd', $null)
+                    $vulnDate -lt $olderDateThreshold
+                } catch {
+                    $false
+                }
+            }
+        }
+
+        # Output the results based on the $OutputFull flag
         if ($OutputFull) {
             $res
         } else {
             $formattedResults = $res | Select-Object plugin_name, 
-                                                       CVE, 
-                                                       cvss3_base_score, 
-                                                       risk_factor, 
-                                                       exploit_available, 
-                                                       exploit_code_maturity, 
-                                                       @{Name="patch_publication_date"; Expression={ 
-                                                            if ($FormatDates) {
-                                                                # Format the date as "d MMMM yyyy"
-                                                                [datetime]::ParseExact($_.patch_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
-                                                            } else {
-                                                                $_.patch_publication_date  # Return original format
-                                                            }
-                                                       }},
-                                                       @{Name="plugin_publication_date"; Expression={ 
-                                                            if ($FormatDates) {
-                                                                # Format the date as "d MMMM yyyy"
-                                                                [datetime]::ParseExact($_.plugin_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
-                                                            } else {
-                                                                $_.plugin_publication_date  # Return original format
-                                                            }
-                                                       }},
-                                                       @{Name="plugin_modification_date"; Expression={ 
-                                                            if ($FormatDates) {
-                                                                # Format the date as "d MMMM yyyy"
-                                                                [datetime]::ParseExact($_.plugin_modification_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
-                                                            } else {
-                                                                $_.plugin_modification_date  # Return original format
-                                                            }
-                                                       }},
-                                                       @{Name="vuln_publication_date"; Expression={ 
-                                                            if ($FormatDates) {
-                                                                # Format the date as "d MMMM yyyy"
-                                                                [datetime]::ParseExact($_.vuln_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
-                                                            } else {
-                                                                $_.vuln_publication_date  # Return original format
-                                                            }
-                                                       }} | 
-                                               Sort-Object $Sort -Descending
+                                                   CVE, 
+                                                   cvss3_base_score, 
+                                                   risk_factor, 
+                                                   exploit_available, 
+                                                   exploit_code_maturity, 
+                                                   @{Name="patch_publication_date"; Expression={ 
+                                                        if ($FormatDates) {
+                                                            [datetime]::ParseExact($_.patch_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
+                                                        } else {
+                                                            $_.patch_publication_date
+                                                        }
+                                                   }},
+                                                   @{Name="plugin_publication_date"; Expression={ 
+                                                        if ($FormatDates) {
+                                                            [datetime]::ParseExact($_.plugin_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
+                                                        } else {
+                                                            $_.plugin_publication_date
+                                                        }
+                                                   }},
+                                                   @{Name="plugin_modification_date"; Expression={ 
+                                                        if ($FormatDates) {
+                                                            [datetime]::ParseExact($_.plugin_modification_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
+                                                        } else {
+                                                            $_.plugin_modification_date
+                                                        }
+                                                   }},
+                                                   @{Name="vuln_publication_date"; Expression={ 
+                                                        if ($FormatDates) {
+                                                            [datetime]::ParseExact($_.vuln_publication_date, 'yyyy/MM/dd', $null).ToString("d MMMM yyyy")
+                                                        } else {
+                                                            $_.vuln_publication_date
+                                                        }
+                                                   }} | 
+                                           Sort-Object $Sort -Descending
             $formattedResults
         }
 
@@ -918,7 +921,7 @@ Function PluginQuery {
             $output = @()
 
             # Select unique CVE and plugin names
-            $res | Select-Object -Property cve, plugin_name -Unique | ForEach-Object {
+            $res | Select-Object -Property cve, plugin_name -Unique | sort plugin_name | ForEach-Object {
                 $CVEcode    = $_.cve
                 $pluginName = $_.plugin_name
 

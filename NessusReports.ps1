@@ -28,10 +28,13 @@
 
 # Setting variable for scipt path
 $Global:scriptpath = $PSScriptRoot
-$Global:Server = "<NESSUS_SERVER_FQDM>"
+$Global:Server     = "SERVERNAME" # Change the defaul server name to your liking or add multiple servers separated with a comma
 $Global:Base_URL   = "https://${Server}:8834"
-$Global:BasePath   = "$HOME"
-$Global:prevpath   = "$BasePath\PreviousNessusScan"
+$Global:BasePath   = "$HOME" # Change this path to alter where the scans and file structure will be saved
+$Global:rootpath   = "$BasePath\NessusReports"
+$Global:prevpath   = "$rootpath\PreviousNessusScan"
+$Global:currpath   = "$rootpath\CurrentNessusScan"
+
 
 # Nessus key pair
 $Global:AccessKey = $($key = get-content $scriptpath\${server}_key.txt       | ConvertTo-SecureString ; [pscredential]::new('user',$key).GetNetworkCredential().Password)
@@ -73,9 +76,6 @@ Function Get-NessusReports {
         [string[]]$Format = 'csv',
 
         [Parameter(Mandatory=$false)]
-        [string]$SaveTo,
-
-        [Parameter(Mandatory=$false)]
         [validateset('Yes','No')]
         [string]$RotateReports = 'Yes',
 
@@ -90,19 +90,16 @@ Function Get-NessusReports {
         [string]$Chapter = 'vuln_hosts_summary'
     )
 
-    # Global parameters
-    $Global:FileFormat = $Format
-    if ($SaveTo) {$Global:path = $SaveTo}
-    else {$Global:path = "$BasePath\CurrentNessusScan"}
+    $Global:FileFormat =  "$Format"
 
     # File structuring for diff comparison
     if ($RotateReports -eq 'Yes') {
         if (!$List -and $Format -ne 'html' -and !$AddAPIkeys) {
-            if (!(Test-Path $BasePath\NessusReports)) {[void](New-Item -Path $BasePath -Name NessusReports -ItemType Directory)}
-            if (!(Test-Path $BasePath\CurrentNessusScan)) {[void](New-Item -Path $BasePath -Name CurrentNessusScan -ItemType Directory)}
-            if (!(Test-Path $BasePath\PreviousNessusScan)) {[void](New-Item -Path $BasePath -Name PreviousNessusScan -ItemType Directory)}
-            [void](Remove-Item -Path $BasePath\PreviousNessusScan\* -Force -Recurse)
-            [void](Move-Item $BasePath\CurrentNessusScan\* -Destination $BasePath\PreviousNessusScan -Force)
+            if ($false -eq (Test-Path $rootpath)) {[void](New-Item -Path $BasePath -Name NessusReports -ItemType Directory)}
+            if ($false -eq (Test-Path $currpath)) {[void](New-Item -Path $rootpath -Name CurrentNessusScan -ItemType Directory)}
+            if ($false -eq (Test-Path $prevpath)) {[void](New-Item -Path $rootpath -Name PreviousNessusScan -ItemType Directory)}
+            [void](Remove-Item -Path $prevpath\* -Force -Recurse)
+            [void](Move-Item $currpath\* -Destination $prevpath -Force)
         }
     }
 
@@ -235,7 +232,7 @@ Function Get-NessusReports {
         if ($list) {scans}
         else {
             if ($Folder) {
-                Write-Host -ForegroundColor Yellow "Downloading report(s) from $Server to $path"
+                Write-Host -ForegroundColor Yellow "Downloading report(s) from $Server to $currpath"
                 $ScanIDs = (scans | ? {$_.folder_id -eq $Folder}).id
                 # Create RunspacePool
                 $RunspacePool = [RunspaceFactory]::CreateRunspacePool(1, [int]$ScanIDs.Count)
@@ -244,7 +241,7 @@ Function Get-NessusReports {
 
                 # Create and execute Runspace for each scan
                 $Runspaces = foreach ($ScanID in $ScanIDs) {
-                    $Runspace = [PowerShell]::Create().AddScript($scriptBlock).AddParameter("ScanID", $ScanID).AddParameter("FileFormat", $FileFormat).AddParameter("Chapter", $Chapter).AddParameter("AccessKey", $AccessKey).AddParameter("SecretKey", $SecretKey).AddParameter("path", $path).AddParameter("Base_URL", $Base_URL)
+                    $Runspace = [PowerShell]::Create().AddScript($scriptBlock).AddParameter("ScanID", $ScanID).AddParameter("FileFormat", $FileFormat).AddParameter("Chapter", $Chapter).AddParameter("AccessKey", $AccessKey).AddParameter("SecretKey", $SecretKey).AddParameter("path", $currpath).AddParameter("Base_URL", $Base_URL)
                     $Runspace.RunspacePool = $RunspacePool
                     $Handle = $Runspace.BeginInvoke()
                     [PSCustomObject] @{
@@ -259,14 +256,14 @@ Function Get-NessusReports {
                 }
 
                 # Returning output from srciptblock
-                $results | where {$_ -imatch 'pss'} | % {Write-Host -f Green $_}
+                $results | % {Write-Host -f Green $_}
 
                 # Clean up RunspacePool
                 $RunspacePool.Close()
                 $RunspacePool.Dispose()
                 }
             else {
-                Write-Host -ForegroundColor Yellow "Downloading report(s) from $Server to $path"
+                Write-Host -ForegroundColor Yellow "Downloading report(s) from $Server to $currpath"
                 if ($Id) { $ScanIDs = $Id }
                 else { $ScanIDs = (scans).id }
                 # Create RunspacePool
@@ -276,7 +273,7 @@ Function Get-NessusReports {
 
                 # Create and execute Runspace for each scan
                 $Runspaces = foreach ($ScanID in $ScanIDs) {
-                    $Runspace = [PowerShell]::Create().AddScript($scriptBlock).AddParameter("ScanID", $ScanID).AddParameter("FileFormat", $FileFormat).AddParameter("Chapter", $Chapter).AddParameter("AccessKey", $AccessKey).AddParameter("SecretKey", $SecretKey).AddParameter("path", $path).AddParameter("Base_URL", $Base_URL)
+                    $Runspace = [PowerShell]::Create().AddScript($scriptBlock).AddParameter("ScanID", $ScanID).AddParameter("FileFormat", $FileFormat).AddParameter("Chapter", $Chapter).AddParameter("AccessKey", $AccessKey).AddParameter("SecretKey", $SecretKey).AddParameter("path", $currpath).AddParameter("Base_URL", $Base_URL)
                     $Runspace.RunspacePool = $RunspacePool
                     $Handle = $Runspace.BeginInvoke()
                     [PSCustomObject] @{
@@ -291,7 +288,7 @@ Function Get-NessusReports {
                 }
 
                 # Returning output from srciptblock
-                return $results | where {$_ -imatch 'pss'}
+                return $results
 
                 # Clean up RunspacePool
                 $RunspacePool.Close()
@@ -310,11 +307,10 @@ Function Import-NessusReports {
         [string]$File,
         [switch]$Previous
     )
-    $path                                = "$BasePath\NessusReports\CurrentNessusScan"
-    $prevpath                            = "$BasePath\NessusReports\PreviousNessusScan"
+
     if ($File) {$Global:NessusReports = Import-Csv $File}
-    if($Previous) {$Global:NessusReports = Import-Csv -Path $prevpath (Get-ChildItem -Path $path -Filter '*.csv').FullName}
-    else {$Global:NessusReports          = Import-Csv -Path (Get-ChildItem -Path $path -Filter '*.csv').FullName}
+    if($Previous) {$Global:NessusReports = Import-Csv (Get-ChildItem -Path $prevpath -Filter '*.csv').FullName}
+    else {$Global:NessusReports          = Import-Csv (Get-ChildItem -Path $currpath -Filter '*.csv').FullName}
     #Write-Host -ForegroundColor Cyan 'Nessusreports imported to function Nessusreport'
 }
 
@@ -333,7 +329,10 @@ Function NessusQuery {
     param
     (
         [Parameter()]
-        [String[]]$CVEScore,
+        [decimal]$CVEScore_greater = 0.0,  # Greater than this score
+
+        [Parameter()]
+        [decimal]$CVEScore_less = 10.0,  # Less than this score (or set a higher default)
 
         [Parameter()]
         [String[]]$CVE,
@@ -378,7 +377,13 @@ Function NessusQuery {
         [String[]]$Port,
 
         [Parameter()]
+        [switch]$LogFixedVersion,
+
+        [Parameter()]
         [switch]$FixedVersion,
+
+        [Parameter()]
+        [switch]$clip,
 
         [Parameter()]
         [String[]]$Exclude = '!#¤%&/()=',
@@ -393,14 +398,13 @@ Function NessusQuery {
                 $ValidSortSet = $SortValidSet | Where-Object -FilterScript { $_ -imatch $wordToComplete }
                 return $ValidSortSet
             } )]
-        [string[]]$Sort = 'CVSS v2.0 Base Score',
+        [string[]]$Sort = 'name',
         
         [Parameter()]
         [switch]$OutputFull
     )
 
-
-    $parameters = @('CVEScore', 'CVE', 'Risk', 'HostName', 'Description', 'Name', 'Exclude', 'Sort', 'PluginOutput', 'Solution', 'Synopsis', 'Protocol', 'PluginID','Port')
+    $parameters = @('CVEScore_greater', 'CVEScore_less', 'CVE', 'Risk', 'HostName', 'Description', 'Name', 'Exclude', 'Sort', 'PluginOutput', 'Solution', 'Synopsis', 'Protocol', 'PluginID','Port')
     $parameters | % {
         $paramvalues = Get-Variable $_ -ValueOnly
         if ($paramvalues.count -gt 1) {
@@ -413,26 +417,17 @@ Function NessusQuery {
         }
     }
 
-    # Escape the variables used with -imatch
-    $Description = [regex]::Escape($Description)
-    $HostName = [regex]::Escape($HostName)
-    $Name = [regex]::Escape($Name)
-    $CVE = [regex]::Escape($CVE)
-    $Risk = [regex]::Escape($Risk)
-    $PluginOutput = [regex]::Escape($PluginOutput)
-    $Solution = [regex]::Escape($Solution)
-    $Synopsis = [regex]::Escape($Synopsis)
-    $Protocol = [regex]::Escape($Protocol)
-    $PluginID = [regex]::Escape($PluginID)
-    $Port = [regex]::Escape($Port)
-    $Exclude = [regex]::Escape($Exclude)
+    # Convert the array of strings into a regex pattern
+    $pattern = ($Exclude -join '|')
 
     $res = Nessusreport | 
     Where-Object { 
         ($_.description -imatch "$Description"-or $_.description -eq "$Description") -and
         ($_.host -imatch "$HostName") -and
         ($_.name -imatch "$Name" -or $_.name -eq "$Name") -and
-        ([decimal]$_.'CVSS v2.0 Base Score' -ge [int]$CVEScore) -and
+        ([decimal]$_.'CVSS v2.0 Base Score' -ge [decimal]$CVEScore) -and
+        ([decimal]$_.'CVSS v2.0 Base Score' -gt $CVEScore_greater -or $CVEScore_greater -eq 0.0) -and
+        ([decimal]$_.'CVSS v2.0 Base Score' -lt $CVEScore_less -or $CVEScore_less -eq 10.0) -and
         ($_.cve -imatch "$CVE") -and
         ($_.risk -imatch "$Risk") -and
         ($_.'Plugin output' -imatch "$PluginOutput") -and
@@ -441,13 +436,57 @@ Function NessusQuery {
         ($_.Protocol -imatch "$Protocol") -and
         ($_.'plugin id' -imatch "$PluginID") -and
         ($_.Port -imatch "$Port") -and
-        ($_ -notmatch "$Exclude") -and
-        ($_.host -notmatch "c1w")
+        ($_ -notmatch "$pattern")
     }
 
     if ($FixedVersion) {
-            $res | sort -Unique name,host | foreach  { Write-Host -f yellow $_.host ; $_ | Select-Object -ExpandProperty 'plugin output' }
+        # Clear the clipboard first
+        Set-Clipboard $null
+        $res | Sort-Object -Property name, host -Unique | ForEach-Object {
+
+            # Write colored output to console
+            $nameLine = $_.name
+            $hostLine = $_.host
+    
+            # Write-Host for color output in console (using different colors)
+            Write-Host $nameLine -ForegroundColor Cyan
+            Write-Host "-------------------------------" -ForegroundColor White
+            Write-Host $hostLine -ForegroundColor Yellow
+
+            # Prepare full output for logging or additional output
+            $fullOutput = @(
+                $nameLine
+                "-------------------------------"
+                $hostLine
+            )
+
+            # Expand 'plugin output' and filter out lines
+            $pluginOutput = $_ | Select-Object -ExpandProperty 'plugin output' |
+                Select-String -Pattern "Remote package installed :", "Should be :", "Path :", "Installed version :", "Fixed version :", "Remote version :"
+
+            # Process each matching line, filter out 'NOTE' and display it
+            $pluginOutput | ForEach-Object {
+                if ($_.Line -notmatch "NOTE") {
+                    Write-Host $_ # Append filtered output to console
+                    $fullOutput += $_ # Append filtered output to log
+                }
+            }
+
+            # Optionally write full output to a file (append mode)
+            if ($LogFixedVersion) {
+                $logFile = "fixedversion.txt"
+                $fullOutput | Out-File -Append -FilePath "$BasePath\$logFile"
+
+            }
+
+            # Append full output to clipboard if -clip switch is used
+            if ($clip) {
+                $currentClip = Get-Clipboard -ErrorAction SilentlyContinue
+                $newClipContent = if ($currentClip) { $currentClip  + $fullOutput } else { $fullOutput}
+                Set-Clipboard -Value $newClipContent
+            }
         }
+    }
     elseif ($OutputFull) {
         $res
     }
@@ -456,15 +495,92 @@ Function NessusQuery {
     }
 }
 
-# Comparing previous downloaded report(s) with last.
+<# Comparing previous downloaded report(s) with last.
 Function Nessus-Diff {
 
-    $oldCsv = Get-ChildItem -Path "$BasePath\NessusReports\PreviousNessusScan" -Filter *.csv | ForEach-Object { Import-Csv $_.FullName }
-    $newCsv = Get-ChildItem -Path "$BasePath\NessusReports\CurrentNessusScan" -Filter *.csv | ForEach-Object { Import-Csv $_.FullName }
+    $oldCsv = Get-ChildItem -Path $prevpath -Filter *.csv | ForEach-Object { Import-Csv $_.FullName }
+    $newCsv = Get-ChildItem -Path $currpath -Filter *.csv | ForEach-Object { Import-Csv $_.FullName }
 
     Compare-Object $oldCsv $newCsv -Property Host,name,cve,'CVSS v2.0 Base Score',Risk -PassThru |
         Select-Object @{Name='Change';Expression={if($_.SideIndicator -eq '<='){ 'Removed' } elseif($_.SideIndicator -eq '=>') { 'Added' } else { 'Changed' }}}, Host, name, cve, 'CVSS v2.0 Base Score', Risk
 
+} #>
+
+
+
+function Nessus-Diff {
+    param (
+        [string]$prevpath = "$rootpath\PreviousNessusScan",
+        [string]$currpath = "$rootpath\CurrentNessusScan"
+    )
+
+    # Check if paths exist
+    if (-not (Test-Path $prevpath)) {
+        Write-Host "The previous path does not exist: $prevpath" -ForegroundColor Red
+        return
+    }
+
+    if (-not (Test-Path $currpath)) {
+        Write-Host "The current path does not exist: $currpath" -ForegroundColor Red
+        return
+    }
+
+    # Get list of CSV files in both folders
+    $prevFiles = Get-ChildItem -Path $prevpath -Filter *.csv
+    $currFiles = Get-ChildItem -Path $currpath -Filter *.csv
+
+    # Create a list to hold all rows from previous and current CSVs
+    $allPrevCsvData = @()
+    $allCurrCsvData = @()
+
+    # Import CSV data from previous files
+    foreach ($file in $prevFiles) {
+        if ($file -and (Test-Path $file.FullName)) {
+            $csvData = Import-Csv -Path $file.FullName
+            $allPrevCsvData += $csvData
+        } else {
+            Write-Host "Warning: File not found or is empty: $($file.FullName)" -ForegroundColor Yellow
+        }
+    }
+
+    # Import CSV data from current files
+    foreach ($file in $currFiles) {
+        if ($file -and (Test-Path $file.FullName)) {
+            $csvData = Import-Csv -Path $file.FullName
+            $allCurrCsvData += $csvData
+        } else {
+            Write-Host "Warning: File not found or is empty: $($file.FullName)" -ForegroundColor Yellow
+        }
+    }
+
+    # Compare the imported data
+    $differences = Compare-Object -ReferenceObject $allPrevCsvData -DifferenceObject $allCurrCsvData -Property Host, name, cve, 'CVSS v2.0 Base Score', Risk -PassThru
+
+    # Check if there are differences and output them
+    if ($differences) {
+        # Create an array to hold formatted differences
+        $formattedDifferences = @()
+
+        foreach ($difference in $differences) {
+            $changeType = if ($difference.SideIndicator -eq '<=') { 'Removed' } elseif ($difference.SideIndicator -eq '=>') { 'Added' } else { 'Changed' }
+            
+            # Prepare a custom object for each difference
+            $formattedDifferences += [PSCustomObject]@{
+                ChangeType             = $changeType
+                Host                   = $difference.Host
+                Name                   = $difference.name
+                CVE                    = $difference.cve
+                'CVSS v2.0 Base Score' = $difference.'CVSS v2.0 Base Score'
+                Risk                   = $difference.Risk
+            }
+        }
+
+        # Output formatted differences to Out-GridView
+        $formattedDifferences
+
+    } else {
+        Write-Host "No differences found between the previous and current scans." -ForegroundColor Green
+    }
 }
 
 # Exporting all nessus reports in to one single CSV file.
@@ -507,7 +623,7 @@ Function Get-PluginDetails() {
 
         try {
             # Fetch the plugin details from the API
-            $pluginres = Invoke-WebRequest @pluginids -ErrorAction Stop 
+            $pluginres = Invoke-WebRequest @pluginids -ErrorAction Stop -UseBasicParsing
         
             # Parse the JSON response
             $Json = $pluginres.Content | ConvertFrom-Json
@@ -699,6 +815,10 @@ Function PluginQuery {
 
         [Parameter()]
         [int]$OlderThanDays = 0,
+
+        [Parameter()]
+        [ValidateSet("patch_publication_date", "plugin_publication_date", "plugin_modification_date", "vuln_publication_date")]
+        [string]$DateField = "vuln_publication_date",  # Default to vuln_publication_date
         
         [Parameter()]
         [switch]$FormatDates,
@@ -710,6 +830,9 @@ Function PluginQuery {
     Begin {
         $jcontent = Get-Content $BasePath\NessusReports\plugindetails.txt -Raw
         $plugindetails = $jcontent | ConvertFrom-Json
+
+        # Convert the array of strings into a regex pattern
+        $pattern = ($Exclude -join '|')
     }
 
     Process {
@@ -769,7 +892,7 @@ Function PluginQuery {
             ($_.required_key -imatch "$required_key" -or $_.required_key -eq "$required_key") -and
             ($_.vuln_publication_date -imatch "$vuln_publication_date" -or $_.vuln_publication_date -eq "$vuln_publication_date") -and
             ($_.see_also -imatch "$see_also" -or $_.see_also -eq "$see_also") -and
-            ($_ -notmatch "$Exclude")
+            ($_ -notmatch "$pattern")
         }
 
         # Filter based on $daysback and $OlderThanDays conditions
@@ -778,7 +901,7 @@ Function PluginQuery {
             # Filter results newer than $daysback
             $res = $res | Where-Object {
                 try {
-                    $vulnDate = [datetime]::ParseExact($_.vuln_publication_date, 'yyyy/MM/dd', $null)
+                    $vulnDate = [datetime]::ParseExact($_.$DateField, 'yyyy/MM/dd', $null)
                     $vulnDate -ge $dateThreshold
                 } catch {
                     $false
@@ -791,7 +914,7 @@ Function PluginQuery {
             # Filter results older than $OlderThanDays
             $res = $res | Where-Object {
                 try {
-                    $vulnDate = [datetime]::ParseExact($_.vuln_publication_date, 'yyyy/MM/dd', $null)
+                    $vulnDate = [datetime]::ParseExact($_.$DateField, 'yyyy/MM/dd', $null)
                     $vulnDate -lt $olderDateThreshold
                 } catch {
                     $false
@@ -847,8 +970,9 @@ Function PluginQuery {
 
             # Filter results based on the publication date threshold
             $res = $res | Where-Object {
-                $vulnDateString = $_.vuln_publication_date
-
+                $vulnDateString = $_.$DateField
+                echo $vulnDateString
+                echo $DateField
                 # Attempt to parse the vuln_publication_date and handle any errors
                 try {
                     # Use the original format 'yyyy/MM/dd' for parsing
@@ -870,7 +994,9 @@ Function PluginQuery {
 
             # Filter results based on the vuln_publication_date threshold
             $res = $res | Where-Object {
-                $vulnDateString = $_.vuln_publication_date
+                $vulnDateString = $_.$DateField
+                echo $DateField
+                echo $vulnDateString
 
                 # Attempt to parse the vuln_publication_date and handle any errors
                 try {
@@ -928,8 +1054,9 @@ Function PluginQuery {
                 # Query for hosts based on plugin name and CVE conditions
                 $h = Nessusreport | Where-Object {
                     $_.name -eq $pluginName -and 
-                    ($_.cve -eq $CVEcode -or -not $CVEcode) -and 
-                    ($_.host -notmatch "c1w")
+                    ($_.cve -eq $CVEcode -or -not $CVEcode) -and
+                    ($_ -notmatch "$pattern")
+                    #($_.host -notmatch "c1w")
                 } | Select-Object -ExpandProperty host -Unique
 
                 # Prepare output for plugins with CVEs
@@ -962,7 +1089,6 @@ Function PluginQuery {
         # Final block if needed
     }
 }
-
 
 Function Export-Plugindetails() {
     $pluginoutput = $($ids = Nessusreport | select -ExpandProperty 'plugin id' -Unique;$ids | % {Get-PluginDetails $_})

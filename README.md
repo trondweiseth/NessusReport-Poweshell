@@ -70,13 +70,18 @@ Edit Mail_Reports.ps1
 
     PluginQuery
         PluginQuery [[-cvss_temporal_vector] <string[]>] [[-plugin_type] {local | remote | combined | Settings | Summary | Third-Party | Reputation}]
-    		[[-description] <string[]>] [[-cvss_base_score] <string[]>] [[-cvss_score_source] <string[]>] [[-cvss3_vector] <string[]>] [[-CVE] <string[]>] [[-solution] <string[]>] [[-cvss3_temporal_score] <string[]>]
-    		[[-script_version] <string[]>] [[-cvss3_base_score_greater] <decimal>] [[-cvss3_base_score_less] <decimal>] [[-rhsa] <string[]>] [[-required_key] <string[]>] [[-vuln_publication_date] <string[]>] [[-cvss_temporal_score] <string[]>] [[-see_also] <string[]>]
-    		[[-threat_intensity_last_28] {Very Low | Low | Medium | High | Very High}] [[-cpe] <string[]>]	[[-age_of_vuln] <string[]>] [[-synopsis] <string[]>] [[-risk_factor] {Info | Low | Medium | High | Critical}] [[-dependency] <string[]>] [[-cvss_vector] <string[]>]
+    		[[-description] <string[]>] [[-cvss_base_score] <string[]>] [[-cvss_score_source] <string[]>] [[-cvss3_vector] <string[]>] [[-CVE] <string[]>]
+        [[-solution] <string[]>] [[-cvss3_temporal_score] <string[]>] [[-script_version] <string[]>] [[-cvss3_base_score_greater] <decimal>]
+        [[-cvss3_base_score_less] <decimal>] [[-rhsa] <string[]>] [[-required_key] <string[]>] [[-vuln_publication_date] <string[]>] [[-cvss_temporal_score] <string[]>]
+        [[-see_also] <string[]>] [[-threat_intensity_last_28] {Very Low | Low | Medium | High | Very High}] [[-cpe] <string[]>]	[[-age_of_vuln] <string[]>]
+        [[-synopsis] <string[]>] [[-risk_factor] {Info | Low | Medium | High | Critical}] [[-dependency] <string[]>] [[-cvss_vector] <string[]>]
     		[[-exploit_available] {false | true}] [[-vendor_severity] <string[]>] [[-product_coverage] {Low | Medium | High | Very High}] [[-vpr_score] <string[]>]
-        [[-plugin_publication_date] <string[]>] [[-cvssV3_impactScore] <string[]>] [[-threat_sources_last_28] <string[]>] [[-exploitability_ease] <string[]>] [[-generated_plugin] <string[]>] [[-fname] <string[]>] [[-xref] <string[]>]
-    		[[-plugin_modification_date] <string[]>] [[-cvss3_temporal_vector] <string[]>] [[-exploit_code_maturity] {High | Functional | PoC | Unproven}] [[-cwe] <string[]>] [[-patch_publication_date] <string[]>] [[-unsupported_by_vendor] {true}]
-    		[[-plugin_name] <string[]>] [[-threat_recency] <string[]>] [[-Exclude] <string[]>] [[-Sort] <string[]>] [[-daysback] <int>] [[-OlderThanDays] <int>] [[-DateField] {patch_publication_date | plugin_publication_date | plugin_modification_date | vuln_publication_date}]
+        [[-plugin_publication_date] <string[]>] [[-cvssV3_impactScore] <string[]>] [[-threat_sources_last_28] <string[]>] [[-exploitability_ease] <string[]>]
+        [[-generated_plugin] <string[]>] [[-fname] <string[]>] [[-xref] <string[]>]
+    		[[-plugin_modification_date] <string[]>] [[-cvss3_temporal_vector] <string[]>] [[-exploit_code_maturity] {High | Functional | PoC | Unproven}]
+        [[-cwe] <string[]>] [[-patch_publication_date] <string[]>] [[-unsupported_by_vendor] {true}]
+    		[[-plugin_name] <string[]>] [[-threat_recency] <string[]>] [[-Exclude] <string[]>] [[-Sort] <string[]>] [[-daysback] <int>] [[-OlderThanDays] <int>]
+        [[-DateField] {patch_publication_date | plugin_publication_date | plugin_modification_date | vuln_publication_date}]
     		[-OutputFull] [-CVSScalc] [-hosts] [-FormatDates] [-LinkToPlugin]
     
     # Exports all nessus reports in to one signle CSV

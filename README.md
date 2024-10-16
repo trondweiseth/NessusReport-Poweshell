@@ -38,11 +38,18 @@ Edit Mail_Reports.ps1
     -Parsing through nessus report(s) for any CVE score grater than 7.9 and a risk of Critical with august in it's name for missing windows patches.
         $> NessusQuery -CVEScore 7.9 -Risk Critical -Name August
         
-    -Comparing previous downloaded reports with current to see any changes are present. In this case only added changes.
-        $> Nessus-Diff -Added
+    -Comparing previous downloaded reports with current to see any changes are present. Here we are sorting on unique vuln name/hostname and pipe it to gridview for more control
+        $> Nessus-Diff | sort-object name,host -unique | out-gridview -passthru
         
     -Exporting all downloaded CVS reports in to one single CVS. Handy for exporting to excel.
         $> Export-Nessusreports -Path $HOME\Downloads
+
+    -Export plugins based on the scans we have downloaded
+        $> Export-PluginDetails
+
+    -Parsing through plugins for each found vulnerability
+        $> PluginQuery -cve cve -FormatDates -daysback 60 -OlderThanDays 30 -DateField patch_publication_date | sort plugin_name | ft
+
 
 
 # Syntax

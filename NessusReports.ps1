@@ -256,7 +256,7 @@ Function Get-NessusReports {
                 }
 
                 # Returning output from srciptblock
-                $results | % {Write-Host -f Green $_}
+                $results | where {$_ -imatch 'pss'} | % {Write-Host -f Green $_}
 
                 # Clean up RunspacePool
                 $RunspacePool.Close()
@@ -288,7 +288,7 @@ Function Get-NessusReports {
                 }
 
                 # Returning output from srciptblock
-                return $results
+                return $results | where {$_ -imatch 'pss'}
 
                 # Clean up RunspacePool
                 $RunspacePool.Close()
@@ -447,7 +447,7 @@ Function NessusQuery {
             # Write colored output to console
             $nameLine = $_.name
             $hostLine = $_.host
-    
+
             # Write-Host for color output in console (using different colors)
             Write-Host $nameLine -ForegroundColor Cyan
             Write-Host "-------------------------------" -ForegroundColor White
@@ -460,29 +460,42 @@ Function NessusQuery {
                 $hostLine
             )
 
-            # Expand 'plugin output' and filter out lines
-            $pluginOutput = $_ | Select-Object -ExpandProperty 'plugin output' |
-                Select-String -Pattern "Remote package installed :", "Should be :", "Path :", "Installed version :", "Fixed version :", "Remote version :"
+            # Expand 'plugin output'
+            $pluginOutput = $_ | Select-Object -ExpandProperty 'plugin output'
 
-            # Process each matching line, filter out 'NOTE' and display it
-            $pluginOutput | ForEach-Object {
-                if ($_.Line -notmatch "NOTE") {
-                    Write-Host $_ # Append filtered output to console
-                    $fullOutput += $_ # Append filtered output to log
+            # Check if pluginOutput is valid
+            if ($pluginOutput) {
+                # Filter lines for relevant patterns
+                $filteredOutput = $pluginOutput | Select-String -Pattern "Remote package installed :", "Should be :", "Path :", "Installed version :", "Fixed version :", "Remote version :"
+
+                # Check if 'Fixed version' is present in the filtered output
+                if ($filteredOutput -and ($filteredOutput -match "Fixed version")) {
+                    # Process each matching line, filter out 'NOTE' and display it
+                    $filteredOutput | ForEach-Object {
+                        if ($_.Line -notmatch "NOTE") {
+                            Write-Host $_.Line # Append filtered output to console
+                            $fullOutput += $_.Line # Append filtered output to log
+                        }
+                    }
+                } else {
+                    # No 'Fixed version' found, output the full plugin output instead
+                    Write-Host $pluginOutput # Display the full plugin output
+                    $fullOutput += $pluginOutput # Append full plugin output to log
                 }
+            } else {
+                Write-Host "No plugin output available for ${nameLine}." -ForegroundColor Yellow
             }
 
             # Optionally write full output to a file (append mode)
             if ($LogFixedVersion) {
                 $logFile = "fixedversion.txt"
                 $fullOutput | Out-File -Append -FilePath "$BasePath\$logFile"
-
             }
 
             # Append full output to clipboard if -clip switch is used
             if ($clip) {
                 $currentClip = Get-Clipboard -ErrorAction SilentlyContinue
-                $newClipContent = if ($currentClip) { $currentClip  + $fullOutput } else { $fullOutput}
+                $newClipContent = if ($currentClip) { $currentClip + $fullOutput } else { $fullOutput }
                 Set-Clipboard -Value $newClipContent
             }
         }

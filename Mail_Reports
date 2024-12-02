@@ -1,89 +1,173 @@
 Import-Module (PATH_TO_NessusReports.ps1)
 Get-NessusReports -Folder FOLDER_NUMBER
+sleep 10
+Export-Plugindetails
 
 #$diffres = Nessus-Diff
-$date = get-date -Format "dd.MM.yyyy"
+$date = get-date -Format "dd MMMM yyyy"
 
-<#
-#### Modify $VulnDiff variable to highlight critical risks and CVSS 10 vulnerabilities ####
-$VulnDiff = '<pre>{0}</pre>' -f ($diffres | ? {$_.'CVSS v2.0 Base Score' -ge 7} | select * -ExcludeProperty host,title |
-    sort name -Unique | sort risk | Format-Table -AutoSize | Out-String -Width 10000)
-$VulnDiff = $VulnDiff -split "`n" | foreach {
-    if ($_ -notmatch "^CVSS v2\.0 Base Score|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
-        "<font color='red'>$_</font>"
-    } else {
-        $_
+# Risk summary counts
+$res = NessusQuery -Risk Medium,High,Critical -CVE cve | Sort-Object name -Unique
+$riskCritical = ($res.risk | Where-Object {$_ -imatch 'critical'}).count
+$riskHigh     = ($res.risk | Where-Object {$_ -imatch 'high'}).count
+$riskMedium   = ($res.risk | Where-Object {$_ -imatch 'medium'}).count
+$riskTotal    = ($riskCritical + $riskHigh + $riskMedium)
+
+# Query for missing patches and highlight critical risks
+$MissingPatches = PluginQuery -plugin_name update -FormatDates | Sort-Object plugin_name
+$missingPatchesHtml = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse:collapse;width:100%;'>"
+$missingPatchesHtml += "<tr>
+  <th style='background-color:MidnightBlue;color:white;'>Plugin Name</th>
+  <th style='background-color:MidnightBlue;color:white;'>CVE</th>
+  <th style='background-color:MidnightBlue;color:white;'>CVSS v3.0</th>
+  <th style='background-color:MidnightBlue;color:white;'>Risk</th>
+  <th style='background-color:MidnightBlue;color:white;'>Exploit Available</th>
+  <th style='background-color:MidnightBlue;color:white;'>Exploit Code Maturity</th>
+  <th style='background-color:MidnightBlue;color:white;'>Patch Publication Date</th>
+  <th style='background-color:MidnightBlue;color:white;'>Plugin Publication Date</th>
+  <th style='background-color:MidnightBlue;color:white;'>Plugin Modification Date</th>
+  <th style='background-color:MidnightBlue;color:white;'>Vuln Publication Date</th>
+</tr>"
+
+foreach ($result in $MissingPatches) {
+    $pluginName = $result.plugin_name
+    $cve = $result.cve
+    $cvssScore = $result.cvss3_base_score
+    $risk = $result.risk_factor
+    $exploitAvailable = $result.exploit_available
+    $exploitCodeMaturity = $result.exploit_code_maturity
+    $patchPublicationDate = $result.patch_publication_date
+    $pluginPublicationDate = $result.plugin_publication_date
+    $pluginModificationDate = $result.plugin_modification_date
+    $vulnPublicationDate = $result.vuln_publication_date
+
+    # Determine the background color based on risk level
+    $color = "white"
+    if ($risk -match "Critical") {
+        $color = "#FF0000"  # Red for Critical
+    } elseif ($risk -match "High") {
+        $color = "#FFA500"  # Orange for High
+    } elseif ($risk -match "Medium") {
+        $color = "#FFFF00"  # Yellow for Medium
+    } elseif ($risk -match "Low") {
+        $color = "#008000"  # Green for Low
     }
-} | Out-String -Width 10000
 
+    # Add a row for each missing patch with corresponding color
+    $missingPatchesHtml += "<tr style='background-color:$color;'>"
+    $missingPatchesHtml += "<td>$pluginName</td>"
+    $missingPatchesHtml += "<td>$cve</td>"
+    $missingPatchesHtml += "<td>$cvssScore</td>"
+    $missingPatchesHtml += "<td>$risk</td>"
+    $missingPatchesHtml += "<td>$exploitAvailable</td>"
+    $missingPatchesHtml += "<td>$exploitCodeMaturity</td>"
+    $missingPatchesHtml += "<td>$patchPublicationDate</td>"
+    $missingPatchesHtml += "<td>$pluginPublicationDate</td>"
+    $missingPatchesHtml += "<td>$pluginModificationDate</td>"
+    $missingPatchesHtml += "<td>$vulnPublicationDate</td>"
+    $missingPatchesHtml += "</tr>"
+}
 
-#### Modify $patchdiff variable to highlight critical risks and CVSS 10 vulnerabilities ####
-$patchdiff = '<pre>{0}</pre>' -f ($diffres | ? {$_.name -imatch 'update'} |
-    select * -ExcludeProperty title | sort name,host -Unique | Format-Table -AutoSize | Out-String -Width 10000)
-$patchdiff = $patchdiff -split "`n" | foreach {
-    if ($_ -notmatch "^Name|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
-        "<font color='red'>$_</font>"
-    } else {
-        $_
+$missingPatchesHtml += "</table>"
+
+# Vulnerability list (colorized by CVSS score or criticality)
+$pluginresults = PluginQuery -cve cve -FormatDates -cvss3_base_score_greater 7 | Sort-Object plugin_name  # Sorting by plugin_name
+$vulnlistHtml = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse:collapse;width:100%;'>"
+$vulnlistHtml += "<tr>
+  <th style='background-color:MidnightBlue;color:white;'>Plugin Name</th>
+  <th style='background-color:MidnightBlue;color:white;'>CVE</th>
+  <th style='background-color:MidnightBlue;color:white;'>CVSS v3.0</th>
+  <th style='background-color:MidnightBlue;color:white;'>Risk</th>
+  <th style='background-color:MidnightBlue;color:white;'>Exploit Available</th>
+  <th style='background-color:MidnightBlue;color:white;'>Exploit Code Maturity</th>
+  <th style='background-color:MidnightBlue;color:white;'>Patch Publication Date</th>
+  <th style='background-color:MidnightBlue;color:white;'>Plugin Publication Date</th>
+  <th style='background-color:MidnightBlue;color:white;'>Plugin Modification Date</th>
+  <th style='background-color:MidnightBlue;color:white;'>Vuln Publication Date</th>
+</tr>"
+
+foreach ($result in $pluginresults) {
+    $pluginName = $result.plugin_name
+    $cve = $result.cve
+    $cvssScore = $result.cvss3_base_score
+    $risk = $result.risk_factor
+    $exploitAvailable = $result.exploit_available
+    $exploitCodeMaturity = $result.exploit_code_maturity
+    $patchPublicationDate = $result.patch_publication_date
+    $pluginPublicationDate = $result.plugin_publication_date
+    $pluginModificationDate = $result.plugin_modification_date
+    $vulnPublicationDate = $result.vuln_publication_date
+
+    # Determine the background color based on risk level
+    $color = "white"
+    if ($risk -match "Critical") {
+        $color = "#FF0000"  # Red for Critical
+    } elseif ($risk -match "High") {
+        $color = "#FFA500"  # Orange for High
+    } elseif ($risk -match "Medium") {
+        $color = "#FFFF00"  # Yellow for Medium
+    } elseif ($risk -match "Low") {
+        $color = "#008000"  # Green for Low
     }
-} | Out-String -Width 10000
-#>
 
-#### Modify $vulnlist variable to highlight critical risks and CVSS 10 vulnerabilities ####
-$vulnlist = '<pre>{0}</pre>' -f ($res = NessusQuery -CVEScore 7 -CVE cve | select Name,CVE,'CVSS v2.0 Base Score',Risk | sort name -Unique | 
-    Format-Table -AutoSize | Out-String -Width 10000)
-$vulnlist = $vulnlist -split "`n" | foreach {
-    if ($_ -notmatch "^CVSS v2\.0 Base Score|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
-        "<font color='red'>$_</font>"
+    # Add a row for each vulnerability with corresponding color
+    $vulnlistHtml += "<tr style='background-color:$color;'>"
+    $vulnlistHtml += "<td>$pluginName</td>"
+    $vulnlistHtml += "<td>$cve</td>"
+    $vulnlistHtml += "<td>$cvssScore</td>"
+    $vulnlistHtml += "<td>$risk</td>"
+    $vulnlistHtml += "<td>$exploitAvailable</td>"
+    $vulnlistHtml += "<td>$exploitCodeMaturity</td>"
+    $vulnlistHtml += "<td>$patchPublicationDate</td>"
+    $vulnlistHtml += "<td>$pluginPublicationDate</td>"
+    $vulnlistHtml += "<td>$pluginModificationDate</td>"
+    $vulnlistHtml += "<td>$vulnPublicationDate</td>"
+    $vulnlistHtml += "</tr>"
+}
+
+$vulnlistHtml += "</table>"
+
+# List of pending reboots
+$MissingReboot = '<pre>{0}</pre>' -f (NessusQuery -Name reboot | Select-Object host,name | Format-Table -AutoSize | Out-String -Width 10000)
+
+# Affected hosts output
+$outputHtml = "<ul>"
+$pluginresults | Select-Object -Property cve, plugin_name -Unique | Sort-Object plugin_name | ForEach-Object {
+    $CVEcode = $_.cve
+    $pluginName = $_.plugin_name
+    $outputHtml += "<li><b style='color:blue;'>Affected hosts for</b> <span style='color:red;'>$pluginName : $CVEcode</span><ul>"
+    $hosts = NessusQuery -Name "$pluginName" | Select-Object -ExpandProperty host -Unique
+    if ($hosts.Count -eq 0) {
+        $outputHtml += "<li>No affected hosts found.</li>"
     } else {
-        $_
+        foreach ($hostname in $hosts) {
+            $outputHtml += "<li style='color:green;'>$hostname</li>"
+        }
     }
-} | Out-String -Width 10000
+    $outputHtml += "</ul></li>"
+}
+$outputHtml += "</ul>"
 
-#### Modify $TopVulnerabilities variable to highlight critical risks and CVSS 10 vulnerabilities ####
-$TopVulnerabilities = '<pre>{0}</pre>' -f ($res = NessusQuery -CVEScore 7 |  ? {$_.name -notmatch 'Update'} |
-    sort name,host -Unique | Format-Table -AutoSize | Out-String -Width 10000)
-$TopVulnerabilities = $TopVulnerabilities -split "`n" | foreach {
-    if ($_ -notmatch "^CVSS v2\.0 Base Score|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
-        "<font color='red'>$_</font>"
-    } else {
-        $_
-    }
-} | Out-String -Width 10000
-
-#### Modify $MissingPatches variable to highlight critical risks and CVSS 10 vulnerabilities ####
-$MissingPatches = '<pre>{0}</pre>' -f ($res = NessusQuery -Name update | select * -ExcludeProperty title |
-    sort name,host -Unique | Format-Table -AutoSize | Out-String -Width 10000)
-$MissingPatches = $MissingPatches -split "`n" | foreach {
-    if ($_ -notmatch "^Name|^----" -and ($_ -like "*Critical*" -or $_ -like "*10.0*")) {
-        "<font color='red'>$_</font>"
-    } else {
-        $_
-    }
-} | Out-String -Width 10000
-
-$MissingReboot = '<pre>{0}</pre>' -f ($res = NessusQuery -name reboot | select host,name | Format-Table -AutoSize | Out-String -Width 10000)
-
-$res = NessusQuery -Risk Medium,High,Critical -CVE cve | sort name -Unique
-$riskCritical = ($res.risk | where {$_ -imatch 'critical'}).count
-$riskhigh     = ($res.risk | where {$_ -imatch 'high'}).count
-$riskMedium   = ($res.risk | where {$_ -imatch 'medium'}).count
-$risktotal    = ($riskCritical + $riskhigh + $riskMedium)
-
-$squaresHTML = @"
+# Assemble the email HTML
+$message = @"
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+    body {
+      background-color: #0c0c0c;
+      color: #FFFFFF;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
     .container {
       display: flex;
-      flex-direction: row; /* Align squares from left to right */
+      flex-direction: row;
       width: 100%;
       height: 100%;
     }
-
     .square {
       width: 100px;
       height: 100px;
@@ -91,87 +175,46 @@ $squaresHTML = @"
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      margin-right: 10px; /* Add margin between squares */
+      margin-right: 10px;
       border-radius: 10px;
-      font-size: 24px; /* Increased font size */
-      font-weight: bold; /* Added font-weight */
+      font-size: 24px;
+      font-weight: bold;
     }
-
-    .critical {
-      background-color: #e74c3c; /* Red for critical */
-      color: #fff;
-    }
-
-    .high {
-      background-color: #f39c12; /* Orange for high */
-      color: #fff;
-    }
-
-    .medium {
-      background-color: #3498db; /* Blue for medium */
-      color: #fff;
-    }
-
-    .total {
-      background-color: #229954; /* Green for total */
-      color: #fff;
-    }
+    .critical { background-color: #e74c3c; color: #fff; }
+    .high { background-color: #f39c12; color: #fff; }
+    .medium { background-color: #3498db; color: #fff; }
+    .total { background-color: #229954; color: #fff; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="square critical">
-      Critical<br>$riskCritical
-    </div>
-    <div class="square high">
-      High<br>$riskhigh
-    </div>
-    <div class="square medium">
-      Medium<br>$riskMedium
-    </div>
-    <div class="square total">
-      Total<br>$risktotal
-    </div>
+    <div class="square critical">Critical<br>$riskCritical</div>
+    <div class="square high">High<br>$riskHigh</div>
+    <div class="square medium">Medium<br>$riskMedium</div>
+    <div class="square total">Total<br>$riskTotal</div>
   </div>
+  <h3 style="background-color:MidnightBlue;">Servers that need reboot after patching.</h3>
+  $MissingReboot
+  <h3 style="background-color:MidnightBlue;">Top Vulnerabilities with CVSS v3.0 score 7 and above for all environments.</h3>
+  $vulnlistHtml
+  <h3 style="background-color:MidnightBlue;">List of affected hosts.</h3>
+  $outputHtml
+  <h3 style="background-color:MidnightBlue;">Missing patches for all environments.</h3>
+  $missingPatchesHtml
 </body>
 </html>
 "@
 
-#### Ceate the e-mail ####
-#### Define variables ####
-$mailfrom = 'MAIL_FROM_ADDRESS'
-$mailto = 'MAIL_TO_ADDRESS'
-$smtpserver = "SMTP_SERVER_ADDRESS"
-$subject = "SUBJECT"
-
-#$Attatchement = Get-ChildItem $HOME\Downloads\Nessusreport\nessus_*.zip
-$message   = "$squaresHTML <br />"
-$message  += "<h3 style='background-color:MidnightBlue;'>Top VLN's with CVSS v2.0 score 7 and above for all eviroments. $date</h3><br />"
-$message  += "$vulnlist"
-$message  += "<h3 style='background-color:MidnightBlue;'>Vulnerabilities/results with CVSS v2.0 score 7 and above for all eviroments. $date</h3><br />"
-$message  += "$TopVulnerabilities"
-#$message += "<h3>Changes from last scan for vulnerabilities:</h3><br />"
-#$message += $VulnDiff
-$message  += "<h3 style='background-color:MidnightBlue;'>Missing patches for all eviroments. $date</h3><br />"
-$message  += $MissingPatches
-$message  += "<h3 style='background-color:MidnightBlue;'>Servers that needs reboot after patching. $date</h3><br />"
-$message  += $MissingReboot
-#$message += "<h3>Changes from last scanfor patches:</h3><br />"
-#$message += $patchdiff
-
-$Mail = @{
-    To           = $mailto
-    From         = $mailfrom
-    Subject      = $subject
+# Email settings
+$MailParams = @{
+    To           = 'mail'
+    From         = 'mail'
+    Subject      = "Nessus daily reports"
     Body         = $message
     Encoding     = "utf8"
-    SMTPServer   = $smtpserver
-    #Port         = 587
+    SMTPServer   = "smtpserver"
     BodyAsHtml   = $true
-    #UseSsl       = $true
-    #Attachment = $Attatchement
 }
 
-Send-MailMessage @Mail
-
-exit
+# Send the email
+Send-MailMessage @MailParams

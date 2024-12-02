@@ -1,5 +1,5 @@
-Import-Module (PATH_TO_NessusReports.ps1)
-Get-NessusReports -Folder FOLDER_NUMBER
+Import-Module "PATH\TO\Nessusreports.ps1"
+Get-NessusReports -Folder 3
 sleep 10
 Export-Plugindetails
 
@@ -14,7 +14,7 @@ $riskMedium   = ($res.risk | Where-Object {$_ -imatch 'medium'}).count
 $riskTotal    = ($riskCritical + $riskHigh + $riskMedium)
 
 # Query for missing patches and highlight critical risks
-$MissingPatches = PluginQuery -plugin_name update -FormatDates | Sort-Object plugin_name
+$MissingPatches = PluginQuery -plugin_name update -FormatDates -Exclude reboot | Sort-Object plugin_name
 $missingPatchesHtml = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse:collapse;width:100%;'>"
 $missingPatchesHtml += "<tr>
   <th style='background-color:MidnightBlue;color:white;'>Plugin Name</th>
@@ -127,8 +127,26 @@ foreach ($result in $pluginresults) {
 
 $vulnlistHtml += "</table>"
 
-# List of pending reboots
-$MissingReboot = '<pre>{0}</pre>' -f (NessusQuery -Name reboot | Select-Object host,name | Format-Table -AutoSize | Out-String -Width 10000)
+# Query for missing patches
+$MissingRebootResults = (NessusQuery -Name reboot | Select-Object host -Unique).host
+
+# Fixing the issue with System.Management.Automation.Internal.Host.InternalHost
+$MissingRebootHtml = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse:collapse;width:100%;'>"
+$MissingRebootHtml += "<tr>
+  <th style='background-color:MidnightBlue;color:white;'>Servers that need reboot after patching</th>
+</tr>"
+
+foreach ($result in $MissingRebootResults) {
+    # Ensuring we extract a clean string for hostnames
+    $hostname = $result.ToString()
+
+    # Add a row for each host needing a reboot
+    $MissingRebootHtml += "<tr>"
+    $MissingRebootHtml += "<td>$hostname</td>"
+    $MissingRebootHtml += "</tr>"
+}
+
+$MissingRebootHtml += "</table>"
 
 # Affected hosts output
 $outputHtml = "<ul>"
@@ -141,7 +159,8 @@ $pluginresults | Select-Object -Property cve, plugin_name -Unique | Sort-Object 
         $outputHtml += "<li>No affected hosts found.</li>"
     } else {
         foreach ($hostname in $hosts) {
-            $outputHtml += "<li style='color:green;'>$hostname</li>"
+            $hostnameString = $hostname.ToString()  # Use ToString() to fix the hostname format
+            $outputHtml += "<li style='color:green;'>$hostnameString</li>"
         }
     }
     $outputHtml += "</ul></li>"
@@ -193,8 +212,8 @@ $message = @"
     <div class="square medium">Medium<br>$riskMedium</div>
     <div class="square total">Total<br>$riskTotal</div>
   </div>
-  <h3 style="background-color:MidnightBlue;">Servers that need reboot after patching.</h3>
-  $MissingReboot
+  <br>
+  $MissingRebootHtml
   <h3 style="background-color:MidnightBlue;">Top Vulnerabilities with CVSS v3.0 score 7 and above for all environments.</h3>
   $vulnlistHtml
   <h3 style="background-color:MidnightBlue;">List of affected hosts.</h3>
@@ -209,10 +228,10 @@ $message = @"
 $MailParams = @{
     To           = 'mail'
     From         = 'mail'
-    Subject      = "Nessus daily reports"
+    Subject      = "Nessus weekly reports"
     Body         = $message
     Encoding     = "utf8"
-    SMTPServer   = "smtpserver"
+    SMTPServer   = "smtp server"
     BodyAsHtml   = $true
 }
 

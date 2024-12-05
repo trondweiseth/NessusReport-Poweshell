@@ -28,12 +28,39 @@
 
 # Setting variable for scipt path
 $Global:scriptpath = $PSScriptRoot
-$Global:Server     = "NESSUS_SERVER" # Change the defaul server name to your liking or add multiple servers separated with a comma
+$Global:Server     = "NESSUS_SERVER # Change the defaul server name to your liking or add multiple servers separated with a comma
 $Global:Base_URL   = "https://${Server}:8834"
 $Global:BasePath   = "c:" # Change this path to alter where the scans and file structure will be saved
 $Global:rootpath   = "$BasePath\NessusReports"
 $Global:prevpath   = "$rootpath\PreviousNessusScan"
 $Global:currpath   = "$rootpath\CurrentNessusScan"
+
+Function Show-Message {
+    $msg = @"
+ ______                             _____                    _                 _               
+|  ___ \                           (____ \                  | |               | |              
+| |   | | ____  ___  ___ _   _  ___ _   \ \ ___  _ _ _ ____ | | ___   ____  _ | | ____  ____   
+| |   | |/ _  )/___)/___) | | |/___) |   | / _ \| | | |  _ \| |/ _ \ / _  |/ || |/ _  )/ ___)  
+| |   | ( (/ /|___ |___ | |_| |___ | |__/ / |_| | | | | | | | | |_| ( ( | ( (_| ( (/ /| |      
+|_|   |_|\____|___/(___/ \____(___/|_____/ \___/ \____|_| |_|_|\___/ \_||_|\____|\____)_|      
+                                                                                               
++------------------------+
+| Author : Trond Weiseth |
++------------------------+
+"@
+    # Display the message
+    Write-Host -ForegroundColor Yellow -BackgroundColor Black $msg
+
+    # Wait for 3 seconds
+    Start-Sleep -Seconds 3
+    cls
+}
+
+# Call the function
+cls
+Show-Message
+
+
 
 Function Fetch-api-keys {
 # Nessus key pair

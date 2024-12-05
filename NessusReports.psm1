@@ -28,17 +28,20 @@
 
 # Setting variable for scipt path
 $Global:scriptpath = $PSScriptRoot
-$Global:Server     = "SERVERNAME" # Change the defaul server name to your liking or add multiple servers separated with a comma
+$Global:Server     = "NESSUS_SERVER" # Change the defaul server name to your liking or add multiple servers separated with a comma
 $Global:Base_URL   = "https://${Server}:8834"
-$Global:BasePath   = "$HOME" # Change this path to alter where the scans and file structure will be saved
+$Global:BasePath   = "c:" # Change this path to alter where the scans and file structure will be saved
 $Global:rootpath   = "$BasePath\NessusReports"
 $Global:prevpath   = "$rootpath\PreviousNessusScan"
 $Global:currpath   = "$rootpath\CurrentNessusScan"
 
-
+Function Fetch-api-keys {
 # Nessus key pair
-$Global:AccessKey = $($key = get-content $scriptpath\${server}_key.txt       | ConvertTo-SecureString ; [pscredential]::new('user',$key).GetNetworkCredential().Password)
-$Global:SecretKey = $($secret = get-content $scriptpath\${server}_secret.txt | ConvertTo-SecureString ; [pscredential]::new('user',$secret).GetNetworkCredential().Password)
+    $Global:AccessKey = $($key = get-content c:\users\$env:USERNAME\NessusAPIkeys\${server}_key.txt       | ConvertTo-SecureString ; [pscredential]::new('user',$key).GetNetworkCredential().Password)
+    $Global:SecretKey = $($secret = get-content c:\users\$env:USERNAME\NessusAPIkeys\${server}_secret.txt | ConvertTo-SecureString ; [pscredential]::new('user',$secret).GetNetworkCredential().Password)
+}
+
+Fetch-api-keys
 
 # Disable ssl validation
 add-type @"
@@ -208,10 +211,12 @@ Function Get-NessusReports {
 
     # Adding nessus API keys for the script to use
     function Add-APIkeys {
+        if ($(test-path c:\users\$env:USERNAME\NessusAPIkeys) -eq $false) {new-Item -ItemType Directory -name NessusAPIkeys}
         $key    = Read-Host -Prompt "Accesskey for $Server" -AsSecureString
-        $key    | ConvertFrom-SecureString > $scriptpath\${server}_key.txt
+        $key    | ConvertFrom-SecureString > c:\users\$env:USERNAME\NessusAPIkeys\${server}_key.txt
         $secret = Read-Host -Prompt "Secret for $Server" -AsSecureString
-        $secret | ConvertFrom-SecureString > $scriptpath\${server}_secret.txt
+        $secret | ConvertFrom-SecureString > c:\users\$env:USERNAME\NessusAPIkeys\${server}_secret.txt
+        Fetch-api-keys
     }
 
     # Main execution
@@ -224,7 +229,7 @@ Function Get-NessusReports {
             Add-APIkeys
             return
         }
-        if (!(Test-Path $scriptpath\${server}_key.txt) -or !(Test-Path $scriptpath\${server}_secret.txt)) {
+        if (!(Test-Path c:\users\$env:USERNAME\NessusAPIkeys\${server}_key.txt) -or !(Test-Path c:\users\$env:USERNAME\NessusAPIkeys\${server}_secret.txt)) {
             Write-Host -ForegroundColor Red -BackgroundColor Black "Missing Nessus API keys! Use parameter -AddAPIkeys to add new pair for $Server."
             return
         }
@@ -622,7 +627,8 @@ Function Get-PluginDetails() {
         )
 
         $error.Clear()
-
+        $ProgressPreference = 'SilentlyContinue'
+        
         # Define the API call parameters
         $pluginids = @{
             "Uri"              = "$Base_URL/plugins/plugin/$plugin_id"
@@ -841,6 +847,7 @@ Function PluginQuery {
     )
  
     Begin {
+        if ($(Test-Path $BasePath\NessusReports\plugindetails.txt) -eq $false) {write-host -ForegroundColor yellow "Missing report. Run 'Export-Plugindetails'" ; break}
         $jcontent = Get-Content $BasePath\NessusReports\plugindetails.txt -Raw
         $plugindetails = $jcontent | ConvertFrom-Json
 
@@ -1104,6 +1111,62 @@ Function PluginQuery {
 }
 
 Function Export-Plugindetails() {
+    write-host -ForegroundColor green "Downloading plugin details. Please wait.."
     $pluginoutput = $($ids = Nessusreport | select -ExpandProperty 'plugin id' -Unique;$ids | % {Get-PluginDetails $_})
     $pluginoutput | ConvertTo-Json | Set-Content -Path "$BasePath\NessusReports\plugindetails.txt"
+    write-host -ForegroundColor green "Done"
+}
+
+Function Format-VulnList {
+    param (
+        [Parameter(ValueFromPipeline = $true)]
+        $InputObject,
+         
+        [switch]$Clip  # Switch to control clipboard output
+    )
+ 
+    # Array to hold all incoming objects
+    begin {
+        $data = @()
+    }
+ 
+    # Collect each piped object in the array
+    process {
+        $data += $InputObject
+    }
+ 
+    # Output all objects at once with headers applied to each row
+    end {
+        # Capture formatted table output with headers
+        $formattedData = ($data | Format-Table | Out-String).Split("`n")
+         
+        # Extract header and separator lines (first 3 lines in the table output)
+        $header = $formattedData | Select-Object -First 3
+ 
+        # Format data without headers
+        $dataObjects = ($data | Format-Table -HideTableHeaders | Out-String).Split("`n") |
+                       Where-Object { $_.Trim() -ne "" }  # Remove any blank lines
+ 
+        # Conditional formatting based on -Clip switch
+        if ($Clip) {
+            # Create compact output for clipboard
+            $result = $dataObjects | ForEach-Object {
+                # Concatenate without extra newlines between blocks
+                ($header + $_ + "#") -join "`n"
+            }
+             
+            # Send compact result to clipboard
+            $result | Out-String | clip.exe
+        }
+        else {
+            # Console output with regular spacing
+            $result = $dataObjects | ForEach-Object {
+                # Standard format with newline between each entry
+                $header + $_ + "#"
+            }
+ 
+            # Output result to console
+            $result | ForEach-Object { Write-Output $_ }
+        }
+    }
 }
